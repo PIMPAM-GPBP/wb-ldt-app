@@ -532,7 +532,11 @@ function buildMapFeatures(
   renderableMapMunicipalityKeys: ReadonlySet<string>,
 ) {
   return featureCollection.features
-    .filter((feature) => renderableMapMunicipalityKeys.has(feature.properties.compositeKey))
+    .filter(
+      (feature) =>
+        Boolean(feature.geometry) &&
+        renderableMapMunicipalityKeys.has(feature.properties.compositeKey),
+    )
     .map((feature) => {
       const municipality = municipalitiesByCompositeKey.get(feature.properties.compositeKey);
       if (!municipality) {
