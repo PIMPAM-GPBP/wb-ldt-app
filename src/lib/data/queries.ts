@@ -16,6 +16,10 @@ import {
   type CountryCode,
 } from "@/lib/countries";
 import { scoreComponentIndicatorMappings } from "@/lib/data/labels";
+import {
+  buildReleaseMunicipalityMembership,
+  filterMunicipalitiesByReleaseMembership,
+} from "@/lib/data/release-membership";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   AnalyticsDataset,
@@ -727,8 +731,9 @@ export async function getAnalyticsPageData(
     existing.push(row);
     scoreComponentRowsByParentId.set(row.parent_score_id, existing);
   }
-  const fallbackMunicipalitiesByCompositeKey = new Map(
-    localFallback.municipalities.map((municipality) => [municipality.compositeKey, municipality]),
+  const fallbackMunicipalityMembership = buildReleaseMunicipalityMembership(
+    localFallback.municipalities,
+    selectedYear,
   );
   const fallbackMapFeatureKeys = new Set(localFallback.mapFeatureKeys);
 
@@ -830,8 +835,14 @@ export async function getAnalyticsPageData(
   const scoreComponentIndex = buildScoreComponentIndex(scoreComponentValueRows);
   const contextIndex = buildContextIndex(contextValueRows);
 
-  const municipalitiesForYear = baseData.municipalities.map((municipality) => {
-    const fallback = fallbackMunicipalitiesByCompositeKey.get(municipality.composite_key);
+  const releaseMunicipalities = filterMunicipalitiesByReleaseMembership(
+    baseData.municipalities,
+    fallbackMunicipalityMembership,
+  );
+  const municipalitiesForYear = releaseMunicipalities.map((municipality) => {
+    const fallback = fallbackMunicipalityMembership.byCompositeKey.get(
+      municipality.composite_key,
+    );
     const scores = scoreIndex.get(municipality.id) ?? {};
     const indicators = indicatorIndex.get(municipality.id) ?? {};
 
