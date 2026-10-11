@@ -37,6 +37,8 @@ const nextConfig: NextConfig = {
     "/zambia": analyticsFallbackFiles,
     "/serbia": analyticsFallbackFiles,
     "/[country]/analytics": analyticsFallbackFiles,
+    "/api/countries/*/sng-metrics": analyticsFallbackFiles,
+    "/api/countries/*/plan-availability": analyticsFallbackFiles,
     "/api/ai/indicator-narrative": analyticsFallbackFiles,
     "/api/ai/investment-recommendations": analyticsFallbackFiles,
     "/api/ai/plan-alignment": analyticsFallbackFiles,
