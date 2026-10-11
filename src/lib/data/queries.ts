@@ -545,6 +545,23 @@ function buildMapFeatures(
     .filter((feature): feature is AnalyticsFeature => feature !== null);
 }
 
+function getRenderableMapMunicipalityKeys(
+  featureCollection: MapFeatureCollection,
+  municipalitiesByCompositeKey: Map<string, MunicipalityRecord>,
+) {
+  const keys = new Set<string>();
+
+  for (const feature of featureCollection.features) {
+    if (!feature.geometry || !municipalitiesByCompositeKey.has(feature.properties.compositeKey)) {
+      continue;
+    }
+
+    keys.add(feature.properties.compositeKey);
+  }
+
+  return keys;
+}
+
 function buildScoreIndex(rows: ScoreValueRow[]) {
   const scoresByMunicipality = new Map<string, Record<string, number | null>>();
 
@@ -710,9 +727,7 @@ export async function getAnalyticsPageData(
   const [baseData, localFallback, featureCollection] = await Promise.all([
     loadSupabaseBaseData(country.code),
     loadLocalAnalyticsFallback(country.code),
-    shouldBuildMapData
-      ? loadMapFeatureCollection(country.code)
-      : Promise.resolve({ type: "FeatureCollection", features: [] } satisfies MapFeatureCollection),
+    loadMapFeatureCollection(country.code),
   ]);
 
   if (baseData.releases.length === 0) {
@@ -912,6 +927,10 @@ export async function getAnalyticsPageData(
   const municipalitiesByCompositeKey = new Map(
     municipalitiesForYear.map((municipality) => [municipality.compositeKey, municipality]),
   );
+  const mapMunicipalityCount = getRenderableMapMunicipalityKeys(
+    featureCollection,
+    municipalitiesByCompositeKey,
+  ).size;
 
   const mapFeatures = shouldBuildMapData
     ? buildMapFeatures(
@@ -1108,8 +1127,8 @@ export async function getAnalyticsPageData(
     },
     coverage: {
       analyticsMunicipalityCount: municipalitiesForYear.length,
-      mapMunicipalityCount: baseData.mapMunicipalityCount,
-      analyticsOnlyCount: municipalitiesForYear.length - baseData.mapMunicipalityCount,
+      mapMunicipalityCount,
+      analyticsOnlyCount: Math.max(0, municipalitiesForYear.length - mapMunicipalityCount),
       boundaryOnlyCount: localFallback.coverage.boundaryOnlyCount,
     },
     selected: {
@@ -1127,7 +1146,7 @@ export async function getAnalyticsPageData(
       metric: selectedMapMetric,
       features: mapFeatures,
       summary: metricSummary,
-      coverageLabel: `${baseData.mapMunicipalityCount} mapped of ${municipalitiesForYear.length} analytics municipalities`,
+      coverageLabel: `${mapMunicipalityCount} mapped of ${municipalitiesForYear.length} analytics municipalities`,
     },
     scatter2d: {
       xMetric: selectedXMetric,
