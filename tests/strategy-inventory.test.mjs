@@ -163,25 +163,84 @@ test("production readiness keeps explicit Serbian translation blockers out of AI
     },
   ];
 
-  const summary = getStrategyInventorySummary(productionRecords, 2);
+  productionRecords.push(
+    {
+      ...productionRecords[0],
+      lsg_id: "novi-sad",
+      lsg_name: "Novi Sad",
+      region_name: "South Backa",
+      translation_status: "needs_translation",
+      ai_ready: true,
+    },
+    {
+      ...productionRecords[0],
+      lsg_id: "kraljevo",
+      lsg_name: "Kraljevo",
+      region_name: "Raska",
+      translation_status: "partial",
+      ai_ready: false,
+    },
+    {
+      ...productionRecords[0],
+      lsg_id: "kragujevac",
+      lsg_name: "Kragujevac",
+      region_name: "Sumadija",
+      translation_status: "partial",
+      ai_ready: true,
+    },
+  );
+
+  const summary = getStrategyInventorySummary(productionRecords, 5);
   const aiReadyRecords = filterStrategyInventoryRecords(productionRecords, {
     readinessCategory: "AI-ready",
   });
   const translationRecords = filterStrategyInventoryRecords(productionRecords, {
     translationStatus: "needs_translation",
   });
+  const partialRecords = filterStrategyInventoryRecords(productionRecords, {
+    translationStatus: "partial",
+  });
 
   assert.equal(getReadinessCategory(productionRecords[0]), "Needs Translation");
   assert.equal(summary.ai_ready_documents, 1);
-  assert.equal(summary.needs_translation, 1);
+  assert.equal(summary.needs_translation, 4);
   assert.deepEqual(
     aiReadyRecords.map((record) => record.lsg_name),
     ["Belgrade-Barajevo"],
   );
   assert.deepEqual(
     translationRecords.map((record) => [record.lsg_name, getReadinessCategory(record)]),
-    [["Aleksandrovac", "Needs Translation"]],
+    [
+      ["Aleksandrovac", "Needs Translation"],
+      ["Novi Sad", "Needs Translation"],
+    ],
   );
+  assert.deepEqual(
+    partialRecords.map((record) => [record.lsg_name, getReadinessCategory(record)]),
+    [
+      ["Kraljevo", "Needs Translation"],
+      ["Kragujevac", "Needs Translation"],
+    ],
+  );
+});
+
+test("Serbian parsed readiness preserves the exception for unblocked translation states", () => {
+  const serbianDocuments = ["not_required", "unknown"].flatMap((translation_status) =>
+    [false, true].map((ai_ready) => ({
+      ...records[1],
+      country_code: "SRB",
+      language: "sr",
+      translation_status,
+      parsing_status: "parsed",
+      ai_ready,
+    })),
+  );
+
+  assert.deepEqual(
+    serbianDocuments.map((record) => getReadinessCategory(record)),
+    ["AI-ready", "AI-ready", "AI-ready", "AI-ready"],
+  );
+  assert.equal(getStrategyInventorySummary(serbianDocuments, 4).ai_ready_documents, 4);
 });
 
 test("blocked count is based on exclusive readiness categories", () => {
