@@ -57,6 +57,7 @@ function isAiReadyRecord(record: StrategyInventoryRecord) {
   return (
     record.source_status === "found" &&
     record.parsing_status === "parsed" &&
+    !hasTranslationBlock(record) &&
     (record.ai_ready || isSerbianLanguageException(record))
   );
 }
