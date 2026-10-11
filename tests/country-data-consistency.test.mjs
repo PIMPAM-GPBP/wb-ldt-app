@@ -32,6 +32,8 @@ function runGeometryScenario(scenario) {
     const features =
       scenario === "null-canonical-geometry"
         ? [{ ...canonicalFeature, geometry: null }]
+        : scenario === "mixed-duplicate-canonical-geometry"
+          ? [canonicalFeature, { ...canonicalFeature, geometry: null }]
         : [];
 
     fs.mkdirSync(path.dirname(path.join(fixtureDirectory, generatedPath)), {
@@ -184,6 +186,17 @@ for (const scenario of ["null-canonical-geometry", "absent-canonical-geometry"])
     assert.equal(result.recordMapAvailable, false);
   });
 }
+
+test("mixed canonical geometry duplicates emit only valid map features", () => {
+  const result = runGeometryScenario("mixed-duplicate-canonical-geometry");
+
+  assert.equal(result.renderedFeatures, 1);
+  assert.equal(result.nullGeometryFeatures, 0);
+  assert.equal(result.coverage.mapMunicipalityCount, 1);
+  assert.equal(result.coverage.analyticsOnlyCount, 0);
+  assert.equal(result.coverageLabel, "1 mapped of 1 analytics municipalities");
+  assert.equal(result.recordMapAvailable, true);
+});
 
 test("release membership follows bundled release identity and selected-year fallback", () => {
   const membership = buildReleaseMunicipalityMembership(
