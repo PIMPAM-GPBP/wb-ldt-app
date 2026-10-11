@@ -724,6 +724,7 @@ export function AiAnalyticsTab({
         eyebrow="AI planning workflow"
         title="Choose local unit and score"
         description="Use the shared local-unit selector in the sidebar, then choose the score theme for the AI planning workflow here. The AI flow currently supports only Prosperity, Infrastructure, and Livability."
+        showEvidenceGap={false}
         actions={
           <StageButton
             label="Download brief"
@@ -833,6 +834,7 @@ export function AiAnalyticsTab({
             ? `Retrieve the ${ai.localPlanUnitName} local/SNG plan context and national plan context, then compare them for the selected unit and score theme.`
             : `No local/SNG plan URL is available for ${ai.localPlanUnitName}. You can still run national plan context; local alignment, SWOT, and recommendations remain blocked for this unit.`
         }
+        showEvidenceGap={false}
         actions={
           <>
             <StageButton

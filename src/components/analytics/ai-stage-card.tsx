@@ -13,6 +13,7 @@ type AiStageCardProps = {
   actions?: ReactNode;
   footerActions?: ReactNode;
   result?: AiStageResponsePayload | null;
+  showEvidenceGap?: boolean;
   resultContent?: ReactNode;
   children?: ReactNode;
 };
@@ -49,6 +50,7 @@ export function AiStageCard({
   actions,
   footerActions,
   result,
+  showEvidenceGap = true,
   resultContent,
   children,
 }: AiStageCardProps) {
@@ -66,7 +68,7 @@ export function AiStageCard({
         .filter(Boolean)
         .join("\n\n")
     : null;
-  const evidenceGap = deriveAiStageEvidenceGap(result);
+  const evidenceGap = showEvidenceGap ? deriveAiStageEvidenceGap(result) : null;
 
   return (
     <section className="rounded-[1.75rem] border border-[var(--border-soft)] bg-[var(--surface-strong)] p-5 shadow-[0_18px_50px_rgba(2,20,32,0.08)] xl:p-6">
