@@ -741,6 +741,10 @@ export async function getAnalyticsPageData(
   const fallbackMunicipalityMembership = buildReleaseMunicipalityMembership(
     localFallback.municipalities,
     selectedYear,
+    {
+      selectedReleaseKey: selectedRelease.release_key,
+      bundledReleaseKey: localFallback.release.key,
+    },
   );
   const fallbackMapFeatureKeys = new Set(localFallback.mapFeatureKeys);
 
@@ -794,15 +798,6 @@ export async function getAnalyticsPageData(
       higherIsBetter: definition.higherIsBetter,
     })),
   ] satisfies MetricDefinition[];
-
-  const availableProvinces = [
-    "all",
-    ...[...new Set(baseData.municipalities.map((municipality) => municipality.province))].sort(),
-  ];
-  const requestedProvince = getSearchValue(searchParams.province, "all");
-  const selectedProvince = availableProvinces.includes(requestedProvince)
-    ? requestedProvince
-    : "all";
 
   const scoreMetrics = metrics.filter((metric) => metric.kind === "score");
   const selectedMapMetric = findMetricById(
@@ -886,6 +881,15 @@ export async function getAnalyticsPageData(
       ),
     } satisfies MunicipalityRecord;
   });
+
+  const availableProvinces = [
+    "all",
+    ...[...new Set(municipalitiesForYear.map((municipality) => municipality.province))].sort(),
+  ];
+  const requestedProvince = getSearchValue(searchParams.province, "all");
+  const selectedProvince = availableProvinces.includes(requestedProvince)
+    ? requestedProvince
+    : "all";
 
   const provinceFilteredMunicipalities =
     selectedProvince === "all"
