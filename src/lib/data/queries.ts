@@ -9,6 +9,7 @@ import type {
   AiIndicatorSeries,
   AiPipelineContext,
 } from "@/lib/ai/types";
+import { InvalidAiScopeError } from "@/lib/ai/request";
 import {
   defaultCountry,
   getCountryByCode,
@@ -1255,12 +1256,14 @@ export async function getMethodologyData() {
 
 export async function getAiPipelineContextForRequest({
   countryCode,
+  releaseKey,
   year,
   municipalityId,
   scoreId,
   includeProvincePlanCandidates = false,
 }: {
   countryCode: CountryCode;
+  releaseKey: string;
   year: number;
   municipalityId: string;
   scoreId: string;
@@ -1273,18 +1276,26 @@ export async function getAiPipelineContextForRequest({
     tab: "ai",
   }, countryCode);
 
+  if (
+    pageData.release.key !== releaseKey ||
+    pageData.release.year !== year ||
+    pageData.municipality.id !== municipalityId ||
+    pageData.ai.selectedScoreId !== scoreId
+  ) {
+    throw new InvalidAiScopeError();
+  }
+
   const provincePlanCandidates = includeProvincePlanCandidates
-    ? await import("@/lib/ai/documents").then((module) =>
-        module.getProvincePlanCandidatesForProvince(
-          pageData.country.code,
-          pageData.ai.localPlanUnitName,
-        ),
-      )
+    ? pageData.ai.provincePlanCandidates
     : [];
 
-  const selectedScore =
-    pageData.ai.scoreOptions.find((option) => option.id === pageData.ai.selectedScoreId) ??
-    pageData.ai.scoreOptions[0];
+  const selectedScore = pageData.ai.scoreOptions.find(
+    (option) => option.id === pageData.ai.selectedScoreId,
+  );
+
+  if (!selectedScore) {
+    throw new InvalidAiScopeError();
+  }
 
   return {
     country: pageData.country,
