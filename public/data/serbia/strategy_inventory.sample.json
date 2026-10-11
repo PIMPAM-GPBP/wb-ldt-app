@@ -4,37 +4,6 @@
   "is_sample_data": true,
   "expected_lsg_count": 161,
   "last_updated": "2026-06-11",
-  "summary_override": {
-    "expected_lsgs": 161,
-    "lsgs_with_any_document": 152,
-    "coverage_rate": 0.9440993788819876,
-    "total_documents_found": 152,
-    "ai_ready_documents": 152,
-    "needs_translation": 0,
-    "needs_validation": 0,
-    "status_breakdown": [
-      {
-        "category": "AI-ready",
-        "count": 152
-      },
-      {
-        "category": "Found / Not Parsed",
-        "count": 0
-      },
-      {
-        "category": "Needs Translation",
-        "count": 0
-      },
-      {
-        "category": "Needs Validation",
-        "count": 0
-      },
-      {
-        "category": "Missing",
-        "count": 9
-      }
-    ]
-  },
   "records": [
     {
       "country_code": "SRB",

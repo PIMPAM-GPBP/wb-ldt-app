@@ -16,6 +16,10 @@ import {
   type CountryCode,
 } from "@/lib/countries";
 import { scoreComponentIndicatorMappings } from "@/lib/data/labels";
+import {
+  buildReleaseMunicipalityMembership,
+  filterMunicipalitiesByReleaseMembership,
+} from "@/lib/data/release-membership";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   AnalyticsDataset,
@@ -356,6 +360,8 @@ const loadScoreValuesForRelease = cache(async (releaseId: string, year: number) 
       .select("municipality_id, score_id, score_value")
       .eq("release_id", releaseId)
       .eq("year", year)
+      .order("municipality_id", { ascending: true })
+      .order("score_id", { ascending: true })
       .range(from, to),
   );
 });
@@ -371,6 +377,8 @@ const loadIndicatorValuesForRelease = cache(
         .eq("release_id", releaseId)
         .eq("year", year)
         .eq("indicator_id", indicatorId)
+        .order("municipality_id", { ascending: true })
+        .order("indicator_id", { ascending: true })
         .range(from, to),
     );
   },
@@ -405,6 +413,8 @@ const loadScoreComponentValuesForRelease = cache(async (releaseId: string, year:
         .select("municipality_id, component_id, score_value")
         .eq("release_id", releaseId)
         .eq("year", year)
+        .order("municipality_id", { ascending: true })
+        .order("component_id", { ascending: true })
         .range(from, to),
     );
   } catch (error) {
@@ -428,6 +438,7 @@ const loadContextValuesForRelease = cache(async (releaseId: string, year: number
         )
         .eq("release_id", releaseId)
         .eq("year", year)
+        .order("municipality_id", { ascending: true })
         .range(from, to),
     );
   } catch (error) {
@@ -727,8 +738,13 @@ export async function getAnalyticsPageData(
     existing.push(row);
     scoreComponentRowsByParentId.set(row.parent_score_id, existing);
   }
-  const fallbackMunicipalitiesByCompositeKey = new Map(
-    localFallback.municipalities.map((municipality) => [municipality.compositeKey, municipality]),
+  const fallbackMunicipalityMembership = buildReleaseMunicipalityMembership(
+    localFallback.municipalities,
+    selectedYear,
+    {
+      selectedReleaseKey: selectedRelease.release_key,
+      bundledReleaseKey: localFallback.release.key,
+    },
   );
   const fallbackMapFeatureKeys = new Set(localFallback.mapFeatureKeys);
 
@@ -783,15 +799,6 @@ export async function getAnalyticsPageData(
     })),
   ] satisfies MetricDefinition[];
 
-  const availableProvinces = [
-    "all",
-    ...[...new Set(baseData.municipalities.map((municipality) => municipality.province))].sort(),
-  ];
-  const requestedProvince = getSearchValue(searchParams.province, "all");
-  const selectedProvince = availableProvinces.includes(requestedProvince)
-    ? requestedProvince
-    : "all";
-
   const scoreMetrics = metrics.filter((metric) => metric.kind === "score");
   const selectedMapMetric = findMetricById(
     metrics,
@@ -830,8 +837,14 @@ export async function getAnalyticsPageData(
   const scoreComponentIndex = buildScoreComponentIndex(scoreComponentValueRows);
   const contextIndex = buildContextIndex(contextValueRows);
 
-  const municipalitiesForYear = baseData.municipalities.map((municipality) => {
-    const fallback = fallbackMunicipalitiesByCompositeKey.get(municipality.composite_key);
+  const releaseMunicipalities = filterMunicipalitiesByReleaseMembership(
+    baseData.municipalities,
+    fallbackMunicipalityMembership,
+  );
+  const municipalitiesForYear = releaseMunicipalities.map((municipality) => {
+    const fallback = fallbackMunicipalityMembership.byCompositeKey.get(
+      municipality.composite_key,
+    );
     const scores = scoreIndex.get(municipality.id) ?? {};
     const indicators = indicatorIndex.get(municipality.id) ?? {};
 
@@ -868,6 +881,15 @@ export async function getAnalyticsPageData(
       ),
     } satisfies MunicipalityRecord;
   });
+
+  const availableProvinces = [
+    "all",
+    ...[...new Set(municipalitiesForYear.map((municipality) => municipality.province))].sort(),
+  ];
+  const requestedProvince = getSearchValue(searchParams.province, "all");
+  const selectedProvince = availableProvinces.includes(requestedProvince)
+    ? requestedProvince
+    : "all";
 
   const provinceFilteredMunicipalities =
     selectedProvince === "all"

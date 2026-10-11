@@ -84,22 +84,6 @@ export type StrategyInventorySummary = {
   latest_last_updated: string | null;
 };
 
-export type StrategyInventorySummaryOverride = Partial<
-  Pick<
-    StrategyInventorySummary,
-    | "expected_lsgs"
-    | "lsgs_with_any_document"
-    | "coverage_rate"
-    | "total_documents_found"
-    | "strategies_found"
-    | "budgets_found"
-    | "ai_ready_documents"
-    | "needs_translation"
-    | "needs_validation"
-    | "status_breakdown"
-  >
->;
-
 export type StrategyInventoryFilters = {
   query?: string;
   publicationYear?: string;
@@ -114,6 +98,5 @@ export type StrategyInventoryDataset = {
   is_sample_data: boolean;
   expected_lsg_count: number;
   last_updated: string;
-  summary_override?: StrategyInventorySummaryOverride;
   records: StrategyInventoryRecord[];
 };

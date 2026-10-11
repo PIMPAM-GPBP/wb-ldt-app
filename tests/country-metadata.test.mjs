@@ -66,7 +66,7 @@ test("Serbia exposes public country-page metadata and municipality/district labe
   assert.equal(country?.adminLabels.higher.singular, "District");
   assert.equal(country?.adminLabels.higher.plural, "Districts");
   assert.equal(country?.profile.populationMillions, 6.7);
-  assert.equal(country?.profile.areaKm2, 312717);
+  assert.equal(country?.profile.areaKm2, null);
   assert.equal(country?.profile.strategy.title, "Serbia 2030 Strategy");
   assert.equal(
     country?.profile.strategy.url,

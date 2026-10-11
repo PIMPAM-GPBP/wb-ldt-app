@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import test from "node:test";
 
 import { buildCountryHomeModel } from "../src/lib/country-home.ts";
@@ -47,4 +48,16 @@ test("country home model uses latest-year rows and configured public totals", ()
       ["Copperbelt", ["Beta"]],
     ],
   );
+});
+
+test("Serbia country home model reports the loaded release area", () => {
+  const serbia = getCountryBySlug("serbia");
+  const dataset = JSON.parse(
+    fs.readFileSync("src/generated/serbia/analytics-data.json", "utf8"),
+  );
+
+  assert.ok(serbia);
+  const model = buildCountryHomeModel(serbia, dataset);
+
+  assert.equal(model.areaLabel, "78,229.4 sq km");
 });
