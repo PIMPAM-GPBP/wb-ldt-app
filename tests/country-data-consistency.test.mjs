@@ -11,13 +11,17 @@ import {
 
 const root = process.cwd();
 
-test("known release membership removes stale database units but unknown releases retain them", () => {
+test("release membership follows bundled release identity and selected-year fallback", () => {
   const membership = buildReleaseMunicipalityMembership(
     [
       { year: 2021, compositeKey: "current" },
       { year: 2025, compositeKey: "current" },
     ],
     2025,
+    {
+      selectedReleaseKey: "npl-2025-v1",
+      bundledReleaseKey: "npl-2025-v1",
+    },
   );
   const rows = [
     { composite_key: "current", id: "current-id" },
@@ -26,12 +30,29 @@ test("known release membership removes stale database units but unknown releases
 
   assert.deepEqual(filterMunicipalitiesByReleaseMembership(rows, membership), [rows[0]]);
 
+  const newerRevision = buildReleaseMunicipalityMembership(
+    [{ year: 2025, compositeKey: "current" }],
+    2025,
+    {
+      selectedReleaseKey: "npl-2025-v2",
+      bundledReleaseKey: "npl-2025-v1",
+    },
+  );
+
+  assert.deepEqual(filterMunicipalitiesByReleaseMembership(rows, newerRevision), rows);
+  assert.ok(newerRevision.byCompositeKey.has("current"));
+
   const unknownRelease = buildReleaseMunicipalityMembership(
     [{ year: 2025, compositeKey: "current" }],
     2030,
+    {
+      selectedReleaseKey: "npl-2030-v1",
+      bundledReleaseKey: "npl-2025-v1",
+    },
   );
 
   assert.deepEqual(filterMunicipalitiesByReleaseMembership(rows, unknownRelease), rows);
+  assert.equal(unknownRelease.byCompositeKey.size, 0);
 });
 
 function installTypescriptRequire() {
@@ -142,6 +163,128 @@ function createSupabaseFixture({ releases, municipalities, scoreValues }) {
 
   return { fetchFixture, requests };
 }
+
+function createReleaseBoundaryFixture({ releaseKey, extraProvince }) {
+  const fallback = JSON.parse(
+    fs.readFileSync(path.join(root, "src/generated/analytics-data.json"), "utf8"),
+  );
+  const canonical = fallback.municipalities.find((row) => row.year === 2025);
+  assert.ok(canonical);
+
+  const municipalities = [
+    {
+      id: "canonical-id",
+      country_code: "NPL",
+      municipality: canonical.municipality,
+      district: canonical.district,
+      province: canonical.province,
+      municipality_slug: canonical.slug.municipality,
+      district_slug: canonical.slug.district,
+      province_slug: canonical.slug.province,
+      composite_key: canonical.compositeKey,
+    },
+    {
+      id: "extra-id",
+      country_code: "NPL",
+      municipality: "New valid municipality",
+      district: canonical.district,
+      province: extraProvince ?? canonical.province,
+      municipality_slug: "new-valid-municipality",
+      district_slug: canonical.slug.district,
+      province_slug: (extraProvince ?? canonical.province).toLowerCase().replaceAll(" ", "-"),
+      composite_key: `${extraProvince ?? canonical.province}::${canonical.district}::New valid municipality`,
+    },
+  ];
+  const releases = [
+    {
+      id: "selected-release",
+      country_code: "NPL",
+      release_key: releaseKey,
+      year: 2025,
+      label: "Nepal LDT 2025",
+      admin_file_name: null,
+      score_file_name: null,
+      geojson_file_name: null,
+      is_active: true,
+      created_at: "2026-10-11T00:00:00Z",
+    },
+  ];
+  const scoreValues = municipalities.flatMap((municipality, index) =>
+    ["infrastructure_score", "livability_score", "prosperity_score"].map((scoreId) => ({
+      municipality_id: municipality.id,
+      score_id: scoreId,
+      score_value: index === 0 ? 40 : 80,
+    })),
+  );
+
+  return {
+    fixture: createSupabaseFixture({ releases, municipalities, scoreValues }),
+    municipalities,
+  };
+}
+
+async function runAnalyticsFixture({ releaseKey, extraProvince, searchParams }) {
+  const { fixture, municipalities } = createReleaseBoundaryFixture({
+    releaseKey,
+    extraProvince,
+  });
+  const previousFetch = globalThis.fetch;
+  const previousUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const previousKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const request = installTypescriptRequire();
+
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://fixture.supabase.test";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "fixture-service-role-key";
+  globalThis.fetch = fixture.fetchFixture;
+
+  try {
+    const { getAnalyticsPageData } = request(path.join(root, "src/lib/data/queries.ts"));
+    return {
+      data: await getAnalyticsPageData(searchParams, "NPL"),
+      municipalities,
+    };
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousUrl === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    else process.env.NEXT_PUBLIC_SUPABASE_URL = previousUrl;
+    if (previousKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    else process.env.SUPABASE_SERVICE_ROLE_KEY = previousKey;
+  }
+}
+
+test("same-year revised releases retain valid database municipalities", async () => {
+  const { data, municipalities } = await runAnalyticsFixture({
+    releaseKey: "npl-2025-v2",
+    searchParams: {
+      tab: "multi",
+      year: "2025",
+      municipality: "extra-id",
+    },
+  });
+
+  assert.equal(data.coverage.analyticsMunicipalityCount, municipalities.length);
+  assert.equal(data.nationalAverages.scores.infrastructure_score, 60);
+  assert.equal(data.selected.municipalityId, "extra-id");
+  assert.equal(data.municipality.id, "extra-id");
+});
+
+test("province filters use only municipalities retained for the selected release", async () => {
+  const { data } = await runAnalyticsFixture({
+    releaseKey: "npl-2025-v1",
+    extraProvince: "Obsolete province",
+    searchParams: {
+      tab: "multi",
+      year: "2025",
+      province: "Obsolete province",
+    },
+  });
+
+  assert.deepEqual(data.filters.provinces, ["all", "Sudur Paschim"]);
+  assert.equal(data.selected.province, "all");
+  assert.equal(data.filters.municipalities.length, 1);
+  assert.equal(data.selected.municipalityId, "canonical-id");
+  assert.deepEqual(data.scatter2d.points.map((point) => point.id), ["canonical-id"]);
+});
 
 test("analytics query uses selected-year fallback membership and historical fallback values", async () => {
   const fallback = JSON.parse(
