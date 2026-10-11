@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test, { after, before, beforeEach } from "node:test";
 
+import { buildAiBriefMarkdownExport } from "../src/lib/ai/export.ts";
+
 const stageRoutes = {
   indicator_narrative: "/api/ai/indicator-narrative",
   province_plan_context: "/api/ai/province-plan-context",
@@ -35,11 +37,17 @@ let fixtureUrl;
 let requestLog;
 let responseModes;
 let delayedStages;
+let heldStages;
+let heldStageResolvers;
+let requestWaiters;
 let dependencyBarrierViolations;
 let requestAiStage;
 let hydrateAiStageResults;
 let clearAiDownstreamResults;
 let AiStageRequestError;
+let createAiStageActionCoordinator;
+let prepareAiStageAction;
+let runAiStageAction;
 
 function buildResponse(stage) {
   return {
@@ -96,6 +104,7 @@ before(async () => {
 
     const body = await readBody(request);
     requestLog.push({ stage, body });
+    requestWaiters.get(stage)?.();
 
     if (!independentStages.includes(stage) && !independentStages.every((name) =>
       requestLog.some((entry) => entry.stage === name),
@@ -105,6 +114,12 @@ before(async () => {
 
     if (delayedStages.has(stage)) {
       await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+
+    if (heldStages.has(stage)) {
+      await new Promise((resolve) => {
+        heldStageResolvers.set(stage, resolve);
+      });
     }
 
     const responseMode = responseModes.get(stage) ?? "completed";
@@ -140,6 +155,9 @@ before(async () => {
     hydrateAiStageResults,
     clearAiDownstreamResults,
     AiStageRequestError,
+    createAiStageActionCoordinator,
+    prepareAiStageAction,
+    runAiStageAction,
   } = await import("../src/lib/ai/client.ts"));
 });
 
@@ -151,8 +169,57 @@ beforeEach(() => {
   requestLog = [];
   responseModes = new Map();
   delayedStages = new Set();
+  heldStages = new Set();
+  heldStageResolvers = new Map();
+  requestWaiters = new Map();
   dependencyBarrierViolations = [];
 });
+
+function waitForStageRequest(stage) {
+  if (requestLog.some((entry) => entry.stage === stage)) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    requestWaiters.set(stage, resolve);
+  });
+}
+
+function releaseHeldStage(stage) {
+  const resolve = heldStageResolvers.get(stage);
+  assert.ok(resolve, `fixture did not hold ${stage}`);
+  resolve();
+  heldStageResolvers.delete(stage);
+}
+
+function buildActionResults() {
+  return Object.fromEntries(
+    allStages.map((stage) => [
+      stage,
+      {
+        ...buildResponse(stage),
+        runId: `old-${stage}`,
+        renderedOutput: `old ${stage}`,
+      },
+    ]),
+  );
+}
+
+function exportActionResults(results) {
+  return buildAiBriefMarkdownExport({
+    countryName: "Zambia",
+    municipalityName: "Chibombo",
+    provinceName: "Central",
+    scoreLabel: "Prosperity Score",
+    releaseKey: validScope.releaseKey,
+    year: validScope.year,
+    generatedAt: "2026-10-11T00:00:00.000Z",
+    stages: allStages.map((stage) => ({
+      label: stage,
+      result: results[stage] ?? null,
+    })),
+  });
+}
 
 test("cache hydration loads independent stages before valid server dependencies", async () => {
   const results = await hydrateAiStageResults(validScope, { baseUrl: fixtureUrl });
@@ -267,4 +334,75 @@ test("downstream invalidation follows the server dependency graph", () => {
   assert.equal(afterWeb.plan_alignment, undefined);
   assert.equal(afterWeb.swot_analysis, undefined);
   assert.equal(afterWeb.investment_recommendations, undefined);
+});
+
+test("explicit actions serialize upstream and dependent stages before export", async () => {
+  heldStages.add("indicator_narrative");
+  const coordinator = createAiStageActionCoordinator();
+  const action = coordinator.begin(buildActionResults());
+  assert.ok(action);
+  prepareAiStageAction(action, "indicator_narrative");
+
+  const narrativeTask = runAiStageAction({
+    coordinator,
+    action,
+    stage: "indicator_narrative",
+    mode: "regenerate",
+    scope: validScope,
+    baseUrl: fixtureUrl,
+  });
+  await waitForStageRequest("indicator_narrative");
+
+  assert.equal(
+    coordinator.begin(action.results),
+    null,
+    "a dependent explicit action cannot start while the upstream action is active",
+  );
+  assert.equal(
+    requestLog.filter((entry) => entry.stage === "swot_analysis").length,
+    0,
+  );
+
+  releaseHeldStage("indicator_narrative");
+  const narrativeResult = await narrativeTask;
+
+  assert.equal(narrativeResult.status, "applied");
+  assert.equal(narrativeResult.response?.runId, "run-indicator_narrative");
+  assert.equal(narrativeResult.results.swot_analysis, undefined);
+  assert.equal(narrativeResult.results.investment_recommendations, undefined);
+  assert.doesNotMatch(exportActionResults(narrativeResult.results), /old swot_analysis/);
+  coordinator.finish(action);
+});
+
+test("failed upstream actions clear dependent results from the exported brief", async () => {
+  heldStages.add("indicator_narrative");
+  responseModes.set("indicator_narrative", "html");
+  const coordinator = createAiStageActionCoordinator();
+  const action = coordinator.begin(buildActionResults());
+  assert.ok(action);
+  prepareAiStageAction(action, "indicator_narrative");
+
+  const narrativeTask = runAiStageAction({
+    coordinator,
+    action,
+    stage: "indicator_narrative",
+    mode: "regenerate",
+    scope: validScope,
+    baseUrl: fixtureUrl,
+  });
+  await waitForStageRequest("indicator_narrative");
+  releaseHeldStage("indicator_narrative");
+  const narrativeResult = await narrativeTask;
+
+  assert.equal(narrativeResult.status, "applied");
+  assert.equal(narrativeResult.response?.status, "failed");
+  assert.equal(narrativeResult.results.indicator_narrative?.status, "failed");
+  assert.equal(narrativeResult.results.swot_analysis, undefined);
+  assert.equal(narrativeResult.results.investment_recommendations, undefined);
+
+  const markdown = exportActionResults(narrativeResult.results);
+  assert.match(markdown, /## indicator_narrative[\s\S]*Status: failed/);
+  assert.match(markdown, /## swot_analysis[\s\S]*Status: not generated/);
+  assert.doesNotMatch(markdown, /old swot_analysis|old investment_recommendations/);
+  coordinator.finish(action);
 });
