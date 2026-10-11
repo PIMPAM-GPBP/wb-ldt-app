@@ -127,6 +127,63 @@ test("Serbian parsed documents are AI-ready without translation", () => {
   ]);
 });
 
+test("production readiness keeps explicit Serbian translation blockers out of AI-ready", () => {
+  const productionRecords = [
+    {
+      country_code: "SRB",
+      lsg_id: "aleksandrovac",
+      lsg_name: "Aleksandrovac",
+      region_name: "Rasina",
+      document_type: "strategy",
+      document_title: "Plan razvoja opstine Aleksandrovac",
+      publication_year: 2020,
+      source_url: "https://www.aleksandrovac.rs/plan-razvoja.pdf",
+      source_status: "found",
+      language: "sr",
+      translation_status: "needs_translation",
+      parsing_status: "parsed",
+      ai_ready: false,
+      last_updated: "2026-06-11",
+    },
+    {
+      country_code: "SRB",
+      lsg_id: "belgrade-barajevo",
+      lsg_name: "Belgrade-Barajevo",
+      region_name: "Belgrade",
+      document_type: "strategy",
+      document_title: "Local development strategy",
+      publication_year: 2023,
+      source_url: "https://example.com/barajevo-strategy.pdf",
+      source_status: "found",
+      language: "sr_en",
+      translation_status: "translated",
+      parsing_status: "parsed",
+      ai_ready: true,
+      last_updated: "2026-06-11",
+    },
+  ];
+
+  const summary = getStrategyInventorySummary(productionRecords, 2);
+  const aiReadyRecords = filterStrategyInventoryRecords(productionRecords, {
+    readinessCategory: "AI-ready",
+  });
+  const translationRecords = filterStrategyInventoryRecords(productionRecords, {
+    translationStatus: "needs_translation",
+  });
+
+  assert.equal(getReadinessCategory(productionRecords[0]), "Needs Translation");
+  assert.equal(summary.ai_ready_documents, 1);
+  assert.equal(summary.needs_translation, 1);
+  assert.deepEqual(
+    aiReadyRecords.map((record) => record.lsg_name),
+    ["Belgrade-Barajevo"],
+  );
+  assert.deepEqual(
+    translationRecords.map((record) => [record.lsg_name, getReadinessCategory(record)]),
+    [["Aleksandrovac", "Needs Translation"]],
+  );
+});
+
 test("blocked count is based on exclusive readiness categories", () => {
   const overlappingRecord = {
     ...records[2],
