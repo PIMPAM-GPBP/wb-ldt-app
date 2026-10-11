@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 import { AiIndicatorChart } from "@/components/analytics/ai-indicator-chart";
 import {
@@ -15,6 +16,13 @@ import {
 } from "@/components/analytics/ai-result-renderers";
 import type { RegionalIndicatorRow } from "@/components/analytics/ai-result-renderers";
 import { AiStageCard } from "@/components/analytics/ai-stage-card";
+import {
+  clearAiDownstreamResults,
+  hydrateAiStageResults,
+  requestAiStage,
+  toFailedAiStagePayload,
+} from "@/lib/ai/client";
+import type { AiStageRequestScope } from "@/lib/ai/client";
 import { buildAiBriefMarkdownExport } from "@/lib/ai/export";
 import type {
   AiStageName,
@@ -23,16 +31,6 @@ import type {
 } from "@/lib/ai/types";
 import { countries } from "@/lib/countries";
 import type { AnalyticsPageData } from "@/types/analytics";
-
-const stageRouteMap: Record<AiStageName, string> = {
-  indicator_narrative: "/api/ai/indicator-narrative",
-  province_plan_context: "/api/ai/province-plan-context",
-  national_plan_context: "/api/ai/national-plan-context",
-  web_context_search: "/api/ai/web-context-search",
-  plan_alignment: "/api/ai/plan-alignment",
-  swot_analysis: "/api/ai/swot-analysis",
-  investment_recommendations: "/api/ai/investment-recommendations",
-};
 
 const planningContextStages: AiStageName[] = [
   "province_plan_context",
@@ -284,32 +282,6 @@ function toFilenamePart(value: string) {
     .slice(0, 64) || "brief";
 }
 
-function toFailedStagePayload(stage: AiStageName, payload: unknown): AiStageResponsePayload {
-  const errorPayload =
-    payload && typeof payload === "object"
-      ? (payload as { error?: unknown; errorMessage?: unknown })
-      : null;
-  const errorMessage =
-    typeof errorPayload?.errorMessage === "string"
-      ? errorPayload.errorMessage
-      : typeof errorPayload?.error === "string"
-        ? errorPayload.error
-        : "The AI stage request failed.";
-
-  return {
-    stage,
-    status: "failed",
-    cacheHit: false,
-    renderedOutput: null,
-    structuredOutput: {},
-    sourceReferences: [],
-    modelName: "n/a",
-    promptVersion: "n/a",
-    updatedAt: new Date().toISOString(),
-    errorMessage,
-  };
-}
-
 function PlanningEvidencePanel({
   title,
   result,
@@ -388,18 +360,99 @@ function PlanningEvidencePanel({
   );
 }
 
+type AiStageResults = Partial<Record<AiStageName, AiStageResponsePayload>>;
+type AiStageLoading = Partial<Record<AiStageName, string>>;
+
+async function runAiStageRequest({
+  stage,
+  mode,
+  basePayload,
+  hydrationControllerRef,
+  activeRequestControllersRef,
+  scopeVersionRef,
+  setHydrationError,
+  setIsHydrating,
+  setLoadingStages,
+  setStageResults,
+}: {
+  stage: AiStageName;
+  mode: "generate" | "regenerate" | "load_cached";
+  basePayload: AiStageRequestScope;
+  hydrationControllerRef: MutableRefObject<AbortController | null>;
+  activeRequestControllersRef: MutableRefObject<Set<AbortController>>;
+  scopeVersionRef: MutableRefObject<number>;
+  setHydrationError: Dispatch<SetStateAction<string | null>>;
+  setIsHydrating: Dispatch<SetStateAction<boolean>>;
+  setLoadingStages: Dispatch<SetStateAction<AiStageLoading>>;
+  setStageResults: Dispatch<SetStateAction<AiStageResults>>;
+}): Promise<AiStageResponsePayload | null> {
+  hydrationControllerRef.current?.abort();
+  hydrationControllerRef.current = null;
+  setIsHydrating(false);
+  setHydrationError(null);
+
+  const controller = new AbortController();
+  const scopeVersion = scopeVersionRef.current;
+  activeRequestControllersRef.current.add(controller);
+  setLoadingStages((current) => ({ ...current, [stage]: mode }));
+
+  try {
+    const payload = await requestAiStage(stage, basePayload, {
+      mode,
+      signal: controller.signal,
+    });
+
+    if (controller.signal.aborted || scopeVersionRef.current !== scopeVersion) {
+      return null;
+    }
+
+    setStageResults((current) => {
+      const next =
+        mode === "generate" || mode === "regenerate"
+          ? clearAiDownstreamResults(current, stage)
+          : { ...current };
+      next[stage] = payload;
+      return next;
+    });
+
+    return payload;
+  } catch (error) {
+    if (controller.signal.aborted || scopeVersionRef.current !== scopeVersion) {
+      return null;
+    }
+
+    const message = error instanceof Error ? error.message : "The AI stage request failed.";
+    const payload = toFailedAiStagePayload(stage, { error: message });
+    setStageResults((current) => ({ ...current, [stage]: payload }));
+    return payload;
+  } finally {
+    activeRequestControllersRef.current.delete(controller);
+    if (!controller.signal.aborted && scopeVersionRef.current === scopeVersion) {
+      setLoadingStages((current) => {
+        const next = { ...current };
+        delete next[stage];
+        return next;
+      });
+    }
+  }
+}
+
 export function AiAnalyticsTab({
   release,
   selected,
   municipality,
   ai,
 }: AiAnalyticsTabProps) {
-  const [stageResults, setStageResults] = useState<
-    Partial<Record<AiStageName, AiStageResponsePayload>>
-  >(ai.cachedStages as Partial<Record<AiStageName, AiStageResponsePayload>>);
-  const [loadingStages, setLoadingStages] = useState<
-    Partial<Record<AiStageName, string>>
-  >({});
+  const [stageResults, setStageResults] = useState<AiStageResults>(
+    ai.cachedStages as AiStageResults,
+  );
+  const [loadingStages, setLoadingStages] = useState<AiStageLoading>({});
+  const [hydrationError, setHydrationError] = useState<string | null>(null);
+  const [isHydrating, setIsHydrating] = useState(false);
+  const [hydrationAttempt, setHydrationAttempt] = useState(0);
+  const hydrationControllerRef = useRef<AbortController | null>(null);
+  const activeRequestControllersRef = useRef<Set<AbortController>>(new Set());
+  const scopeVersionRef = useRef(0);
 
   const basePayload = useMemo(
     () => ({
@@ -412,52 +465,75 @@ export function AiAnalyticsTab({
     [ai.selectedScoreId, municipality.id, release.countryCode, release.key, release.year],
   );
 
-  async function runStage(
-    stage: AiStageName,
-    mode: "generate" | "regenerate" | "load_cached",
-    options?: { silentMissingCache?: boolean },
-  ): Promise<AiStageResponsePayload | null> {
-    setLoadingStages((current) => ({ ...current, [stage]: mode }));
+  useEffect(() => {
+    const controller = new AbortController();
+    const scopeVersion = ++scopeVersionRef.current;
+    const activeRequestControllers = activeRequestControllersRef.current;
+    hydrationControllerRef.current = controller;
 
-    try {
-      const response = await fetch(stageRouteMap[stage], {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          ...basePayload,
-          mode,
-        }),
-      });
-
-      const rawPayload = (await response.json()) as unknown;
-      const payload = response.ok
-        ? (rawPayload as AiStageResponsePayload)
-        : toFailedStagePayload(stage, rawPayload);
-
-      if (
-        options?.silentMissingCache &&
-        payload.status === "failed" &&
-        payload.errorMessage?.toLowerCase().includes("no cached")
-      ) {
-        return null;
+    queueMicrotask(() => {
+      if (controller.signal.aborted || scopeVersionRef.current !== scopeVersion) {
+        return;
       }
 
-      setStageResults((current) => ({
-        ...current,
-        [stage]: payload,
-      }));
+      setHydrationError(null);
+      setIsHydrating(true);
+    });
 
-      return payload;
-    } finally {
-      setLoadingStages((current) => {
-        const next = { ...current };
-        delete next[stage];
-        return next;
+    void hydrateAiStageResults(basePayload, { signal: controller.signal })
+      .then((results) => {
+        if (controller.signal.aborted || scopeVersionRef.current !== scopeVersion) {
+          return;
+        }
+
+        setStageResults(results);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted || scopeVersionRef.current !== scopeVersion) {
+          return;
+        }
+
+        setHydrationError(
+          error instanceof Error
+            ? error.message
+            : "Unable to restore saved AI results.",
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted && scopeVersionRef.current === scopeVersion) {
+          setIsHydrating(false);
+        }
       });
-    }
-  }
+
+    return () => {
+      controller.abort();
+      for (const activeController of activeRequestControllers) {
+        activeController.abort();
+      }
+      if (hydrationControllerRef.current === controller) {
+        hydrationControllerRef.current = null;
+      }
+      scopeVersionRef.current += 1;
+    };
+  }, [basePayload, hydrationAttempt]);
+
+  const runStage = useCallback(async function runStage(
+    stage: AiStageName,
+    mode: "generate" | "regenerate" | "load_cached",
+  ): Promise<AiStageResponsePayload | null> {
+    return runAiStageRequest({
+      stage,
+      mode,
+      basePayload,
+      hydrationControllerRef,
+      activeRequestControllersRef,
+      scopeVersionRef,
+      setHydrationError,
+      setIsHydrating,
+      setLoadingStages,
+      setStageResults,
+    });
+  }, [basePayload]);
 
   const hasIndicatorNarrative = stageResults.indicator_narrative?.status === "completed";
   const hasAlignment = stageResults.plan_alignment?.status === "completed";
@@ -472,6 +548,10 @@ export function AiAnalyticsTab({
     countries.find((country) => country.code === release.countryCode)?.name ??
     release.countryCode;
   const hasAnyStageResult = exportStageLabels.some(({ stage }) => Boolean(stageResults[stage]));
+
+  function retryHydration() {
+    setHydrationAttempt((attempt) => attempt + 1);
+  }
 
   function downloadAiBrief() {
     if (!hasAnyStageResult) {
@@ -702,6 +782,28 @@ export function AiAnalyticsTab({
 
       <WorkflowProgressRail steps={workflowSteps} />
 
+      {isHydrating ? (
+        <p
+          role="status"
+          className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-strong)] px-4 py-3 text-sm text-[var(--muted-foreground)]"
+        >
+          Checking saved AI results for this release, local unit, and score theme...
+        </p>
+      ) : null}
+      {hydrationError ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[rgba(228,87,86,0.34)] bg-[rgba(228,87,86,0.08)] px-4 py-3 text-sm text-[#b23b3a]"
+        >
+          <span>{hydrationError}</span>
+          <StageButton
+            label={isHydrating ? "Retrying..." : "Retry saved results"}
+            onClick={retryHydration}
+            disabled={isHydrating}
+          />
+        </div>
+      ) : null}
+
       <AiStageCard
         eyebrow="Step 1"
         title="Component score analysis"
@@ -798,7 +900,7 @@ export function AiAnalyticsTab({
       <AiStageCard
         eyebrow="Step 4"
         title="SWOT analysis"
-        description="Generate a local-unit SWOT grounded in the chosen score, the indicator narrative, the planning alignment, and any optional web context already added."
+        description="Generate a local-unit SWOT grounded in the chosen score, the indicator narrative, current local and national plan contexts, and any optional web context. The workflow still gates SWOT on planning alignment completion."
         actions={buildStageActions(
           "swot_analysis",
           !hasIndicatorNarrative || !hasAlignment || !ai.localPlanAvailable,
