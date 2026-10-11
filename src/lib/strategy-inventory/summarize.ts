@@ -22,8 +22,19 @@ function hasDocumentSource(record: StrategyInventoryRecord) {
   return record.source_status === "found" || record.source_status === "needs_validation";
 }
 
+function hasTranslationBlock(record: StrategyInventoryRecord) {
+  return (
+    record.translation_status === "needs_translation" ||
+    record.translation_status === "partial"
+  );
+}
+
 function isSerbianLanguageException(record: StrategyInventoryRecord) {
-  return record.country_code === "SRB" && record.language === "sr";
+  return (
+    record.country_code === "SRB" &&
+    record.language === "sr" &&
+    !hasTranslationBlock(record)
+  );
 }
 
 function needsTranslation(record: StrategyInventoryRecord) {
@@ -31,10 +42,7 @@ function needsTranslation(record: StrategyInventoryRecord) {
     return false;
   }
 
-  return (
-    record.translation_status === "needs_translation" ||
-    record.translation_status === "partial"
-  );
+  return hasTranslationBlock(record);
 }
 
 function needsValidation(record: StrategyInventoryRecord) {

@@ -73,7 +73,7 @@ const records = [
 
 test("readiness category follows the dashboard blocking order", () => {
   assert.equal(getReadinessCategory(records[0]), "AI-ready");
-  assert.equal(getReadinessCategory(records[1]), "Found / Not Parsed");
+  assert.equal(getReadinessCategory(records[1]), "Needs Translation");
   assert.equal(getReadinessCategory(records[2]), "Needs Validation");
   assert.equal(getReadinessCategory(records[3]), "Missing");
   assert.equal(
@@ -107,7 +107,7 @@ test("Serbian parsed documents are AI-ready without translation", () => {
     ...records[1],
     country_code: "SRB",
     language: "sr",
-    translation_status: "needs_translation",
+    translation_status: "not_required",
     parsing_status: "parsed",
     ai_ready: false,
   };
@@ -198,7 +198,7 @@ test("blocked count is based on exclusive readiness categories", () => {
     (summary.status_breakdown.find((entry) => entry.category === "Needs Translation")?.count ?? 0) +
     (summary.status_breakdown.find((entry) => entry.category === "Needs Validation")?.count ?? 0);
 
-  assert.equal(summary.needs_translation, 0);
+  assert.equal(summary.needs_translation, 1);
   assert.equal(summary.needs_validation, 1);
   assert.equal(blockedCount, 1);
 });
@@ -219,7 +219,7 @@ test("strategy inventory summary separates LSG coverage from document counts", (
   assert.equal(summary.strategies_found, 2);
   assert.equal(summary.budgets_found, 1);
   assert.equal(summary.ai_ready_documents, 1);
-  assert.equal(summary.needs_translation, 0);
+  assert.equal(summary.needs_translation, 2);
   assert.equal(summary.needs_validation, 1);
   assert.deepEqual(summary.publication_year_counts, [
     { year: "2023", count: 1 },
@@ -270,7 +270,7 @@ test("strategy inventory filters combine search, year, readiness, type, and tran
   const filtered = filterStrategyInventoryRecords(records, {
     query: "ada",
     publicationYear: "2024",
-    readinessCategory: "Found / Not Parsed",
+    readinessCategory: "Needs Translation",
     documentType: "budget",
     translationStatus: "needs_translation",
   });

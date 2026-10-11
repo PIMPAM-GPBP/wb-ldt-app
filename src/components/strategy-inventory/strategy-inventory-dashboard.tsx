@@ -557,7 +557,7 @@ function StrategyInventoryTable({
                       {parsingStatusLabels[record.parsing_status]}
                     </td>
                     <td className="px-4 py-4 text-sm text-[var(--foreground)]">
-                      {record.ai_ready ? "Yes" : "No"}
+                      {readinessCategory === "AI-ready" ? "Yes" : "No"}
                     </td>
                     <td className="px-4 py-4">
                       {record.source_url ? (
