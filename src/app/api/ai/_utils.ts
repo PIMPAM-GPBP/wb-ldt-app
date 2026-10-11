@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { validateAiStageRequestPayload } from "@/lib/ai/request";
+import {
+  InvalidAiScopeError,
+  validateAiStageRequestPayload,
+} from "@/lib/ai/request";
 import type { AiStageRequestPayload } from "@/lib/ai/types";
 
 function isAiGenerationAllowed(request: Request) {
@@ -56,7 +59,22 @@ function serializeStageError(error: unknown) {
 }
 
 export async function parseAiStageRequest(request: Request) {
-  const payload = (await request.json()) as Partial<AiStageRequestPayload>;
+  let payload: Partial<AiStageRequestPayload>;
+
+  try {
+    payload = (await request.json()) as Partial<AiStageRequestPayload>;
+  } catch {
+    return {
+      ok: false as const,
+      response: NextResponse.json(
+        {
+          error: "Invalid JSON request body.",
+        },
+        { status: 400 },
+      ),
+    };
+  }
+
   const validated = validateAiStageRequestPayload(payload);
 
   if (!validated.ok) {
@@ -91,6 +109,15 @@ export async function parseAiStageRequest(request: Request) {
 }
 
 export function toStageErrorResponse(stage: string, error: unknown) {
+  if (error instanceof InvalidAiScopeError) {
+    return NextResponse.json(
+      {
+        error: error.message,
+      },
+      { status: 400 },
+    );
+  }
+
   const message = serializeStageError(error);
   console.error(`AI stage ${stage} failed:`, error);
 

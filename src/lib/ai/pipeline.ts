@@ -1197,6 +1197,7 @@ export async function runAiStage(
 ): Promise<AiStageResponsePayload> {
   const context = await getAiPipelineContextForRequest({
     countryCode: payload.countryCode,
+    releaseKey: payload.releaseKey,
     year: payload.year,
     municipalityId: payload.municipalityId,
     scoreId: payload.scoreId,
