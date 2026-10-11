@@ -57,7 +57,7 @@ const fixtureScoreDefinitions = [
 const fixtureProvincePlanSource = {
   country_code: "ZMB",
   plan_level: "province",
-  province: "Eastern",
+  province: "Chadiza",
   title: "Eastern fixture plan",
   link: "https://example.test/eastern-plan.pdf",
   notes: null,
@@ -127,7 +127,7 @@ function documentOutput(stage, current) {
     countryCode: "ZMB",
     sourceType: isProvince ? "province_plan" : "national_plan",
     title: source.title,
-    province: isProvince ? "Eastern" : null,
+    province: isProvince ? "Chadiza" : null,
     sourceUrlOrPath: source.link,
     contentMode: "full_text",
     extractedText: `Current ${stage} fixture evidence`,
@@ -248,7 +248,7 @@ before(async () => {
 
   const nullProvinceInput = {
     countryCode: fixtureRelease.country_code,
-    localPlanUnitName: fixtureMunicipality.province,
+    localPlanUnitName: fixtureMunicipality.municipality,
     selectedPlanUrl: null,
     evidence: [],
     extractionVersion: "v2",
