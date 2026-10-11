@@ -94,8 +94,6 @@ function isMissingRelationError(error: unknown) {
   return code === "PGRST205" || code === "42P01";
 }
 
-const planDocumentSourcesCache = new Map<AiDocumentContext["countryCode"], PlanDocumentSource[]>();
-
 function getScoreThemeFromScoreId(scoreId: string) {
   const normalized = scoreId.toLowerCase();
 
@@ -117,12 +115,6 @@ function getScoreThemeFromScoreId(scoreId: string) {
 async function loadPlanDocumentSources(
   countryCode: AiDocumentContext["countryCode"],
 ): Promise<PlanDocumentSource[]> {
-  const cached = planDocumentSourcesCache.get(countryCode);
-
-  if (cached) {
-    return cached;
-  }
-
   const supabase = getSupabaseServerClient().schema("analytics");
   const { data, error } = await supabase
     .from("plan_document_sources")
@@ -161,7 +153,6 @@ async function loadPlanDocumentSources(
     );
   }
 
-  planDocumentSourcesCache.set(countryCode, sources);
   return sources;
 }
 

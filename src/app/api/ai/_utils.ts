@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getAiPromptVersion } from "@/lib/ai/cache";
 import {
   InvalidAiScopeError,
   validateAiStageRequestPayload,
@@ -130,7 +131,7 @@ export function toStageErrorResponse(stage: string, error: unknown) {
       structuredOutput: {},
       sourceReferences: [],
       modelName: process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
-      promptVersion: process.env.AI_PROMPT_VERSION ?? "v1",
+      promptVersion: getAiPromptVersion(),
       updatedAt: new Date().toISOString(),
       errorMessage: message,
     },

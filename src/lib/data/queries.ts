@@ -1264,12 +1264,7 @@ export async function getAiPipelineContextForRequest({
   }
 
   const provincePlanCandidates = includeProvincePlanCandidates
-    ? await import("@/lib/ai/documents").then((module) =>
-        module.getProvincePlanCandidatesForProvince(
-          pageData.country.code,
-          pageData.ai.localPlanUnitName,
-        ),
-      )
+    ? pageData.ai.provincePlanCandidates
     : [];
 
   const selectedScore = pageData.ai.scoreOptions.find(

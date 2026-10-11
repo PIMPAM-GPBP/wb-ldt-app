@@ -5,7 +5,6 @@ import {
   getAiInvalidationVersion,
   getAiPromptVersion,
   loadAiStageCache,
-  loadLatestAiStageCacheByScope,
   saveDocumentContext,
   saveAiStageCache,
   saveAiStageRun,
@@ -36,6 +35,10 @@ import type {
 import { getAiPipelineContextForRequest } from "@/lib/data/queries";
 
 const DOCUMENT_MODEL_NAME = "document-parser";
+
+type AiStageDependencyResolver = (
+  stage: AiStageName,
+) => Promise<AiStageResponsePayload | null>;
 
 function buildDocumentStageOutput(context: AiDocumentContext, sourceLabel: string) {
   const excerpt = context.passages.slice(0, 12).map((passage) => passage.text).join("\n\n");
@@ -690,18 +693,6 @@ async function runNationalPlanStage(
   });
 }
 
-async function loadRequiredStage(stage: AiStageName, context: AiPipelineContext) {
-  return loadLatestAiStageCacheByScope({
-    stage,
-    countryCode: context.country.code,
-    releaseKey: context.releaseKey,
-    year: context.year,
-    municipalityId: context.municipality.id,
-    province: context.municipality.province,
-    scoreId: context.score.id,
-  });
-}
-
 async function runWebContextSearchStage(
   context: AiPipelineContext,
   mode: AiStageRequestPayload["mode"],
@@ -819,13 +810,14 @@ async function runWebContextSearchStage(
 async function runAlignmentStage(
   context: AiPipelineContext,
   mode: AiStageRequestPayload["mode"],
+  resolveDependency: AiStageDependencyResolver,
 ) {
   const modelName = getOpenAiModel();
   const [provinceStage, nationalStage] = await Promise.all([
-    loadRequiredStage("province_plan_context", context),
-    loadRequiredStage("national_plan_context", context),
+    resolveDependency("province_plan_context"),
+    resolveDependency("national_plan_context"),
   ]);
-  const webContextStage = await loadRequiredStage("web_context_search", context);
+  const webContextStage = await resolveDependency("web_context_search");
 
   if (
     !provinceStage ||
@@ -945,18 +937,19 @@ async function runAlignmentStage(
 async function runSwotStage(
   context: AiPipelineContext,
   mode: AiStageRequestPayload["mode"],
+  resolveDependency: AiStageDependencyResolver,
 ) {
   const modelName = getOpenAiModel();
-  const indicatorStage = await loadRequiredStage("indicator_narrative", context);
+  const indicatorStage = await resolveDependency("indicator_narrative");
   if (!indicatorStage?.renderedOutput) {
     return toFailureStage("swot_analysis", modelName, "Indicator narrative must be generated before SWOT can run.");
   }
 
   const [provinceStage, nationalStage] = await Promise.all([
-    loadRequiredStage("province_plan_context", context),
-    loadRequiredStage("national_plan_context", context),
+    resolveDependency("province_plan_context"),
+    resolveDependency("national_plan_context"),
   ]);
-  const webContextStage = await loadRequiredStage("web_context_search", context);
+  const webContextStage = await resolveDependency("web_context_search");
 
   if (!provinceStage?.structuredOutput || !nationalStage?.structuredOutput) {
     return toFailureStage(
@@ -1081,14 +1074,15 @@ async function runSwotStage(
 async function runRecommendationsStage(
   context: AiPipelineContext,
   mode: AiStageRequestPayload["mode"],
+  resolveDependency: AiStageDependencyResolver,
 ) {
   const modelName = getOpenAiModel();
   const [indicatorStage, alignmentStage, swotStage] = await Promise.all([
-    loadRequiredStage("indicator_narrative", context),
-    loadRequiredStage("plan_alignment", context),
-    loadRequiredStage("swot_analysis", context),
+    resolveDependency("indicator_narrative"),
+    resolveDependency("plan_alignment"),
+    resolveDependency("swot_analysis"),
   ]);
-  const webContextStage = await loadRequiredStage("web_context_search", context);
+  const webContextStage = await resolveDependency("web_context_search");
 
   if (!indicatorStage?.renderedOutput || !alignmentStage?.renderedOutput || !swotStage?.renderedOutput) {
     return toFailureStage(
@@ -1191,6 +1185,53 @@ async function runRecommendationsStage(
   });
 }
 
+function createAiStageDispatcher(context: AiPipelineContext) {
+  const dependencyPromises = new Map<
+    AiStageName,
+    Promise<AiStageResponsePayload | null>
+  >();
+
+  const dispatch = async (
+    stage: AiStageName,
+    mode: AiStageRequestPayload["mode"],
+  ): Promise<AiStageResponsePayload> => {
+    switch (stage) {
+      case "indicator_narrative":
+        return runIndicatorNarrativeStage(context, mode);
+      case "province_plan_context":
+        return runProvincePlanStage(context, mode);
+      case "national_plan_context":
+        return runNationalPlanStage(context, mode);
+      case "web_context_search":
+        return runWebContextSearchStage(context, mode);
+      case "plan_alignment":
+        return runAlignmentStage(context, mode, resolveDependency);
+      case "swot_analysis":
+        return runSwotStage(context, mode, resolveDependency);
+      case "investment_recommendations":
+        return runRecommendationsStage(context, mode, resolveDependency);
+      default:
+        return toFailureStage(stage, getOpenAiModel(), "Unsupported AI stage.");
+    }
+  };
+
+  const resolveDependency: AiStageDependencyResolver = (stage) => {
+    const existing = dependencyPromises.get(stage);
+
+    if (existing) {
+      return existing;
+    }
+
+    const dependency = dispatch(stage, "load_cached").then((response) =>
+      response.status === "completed" ? response : null,
+    );
+    dependencyPromises.set(stage, dependency);
+    return dependency;
+  };
+
+  return { dispatch };
+}
+
 export async function runAiStage(
   stage: AiStageName,
   payload: AiStageRequestPayload,
@@ -1201,26 +1242,13 @@ export async function runAiStage(
     year: payload.year,
     municipalityId: payload.municipalityId,
     scoreId: payload.scoreId,
-    includeProvincePlanCandidates:
-      stage === "province_plan_context" || stage === "plan_alignment",
+    includeProvincePlanCandidates: [
+      "province_plan_context",
+      "plan_alignment",
+      "swot_analysis",
+      "investment_recommendations",
+    ].includes(stage),
   });
 
-  switch (stage) {
-    case "indicator_narrative":
-      return runIndicatorNarrativeStage(context, payload.mode);
-    case "province_plan_context":
-      return runProvincePlanStage(context, payload.mode);
-    case "national_plan_context":
-      return runNationalPlanStage(context, payload.mode);
-    case "web_context_search":
-      return runWebContextSearchStage(context, payload.mode);
-    case "plan_alignment":
-      return runAlignmentStage(context, payload.mode);
-    case "swot_analysis":
-      return runSwotStage(context, payload.mode);
-    case "investment_recommendations":
-      return runRecommendationsStage(context, payload.mode);
-    default:
-      return toFailureStage(stage, getOpenAiModel(), "Unsupported AI stage.");
-  }
+  return createAiStageDispatcher(context).dispatch(stage, payload.mode);
 }
