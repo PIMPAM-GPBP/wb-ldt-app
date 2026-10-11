@@ -7,7 +7,7 @@ import { EvidenceGapBadge } from "@/components/analytics/evidence-gap-badge";
 import { PlotlyChart } from "@/components/analytics/plotly-chart";
 import { useTheme } from "@/components/theme/theme-provider";
 import type { AdminLabels } from "@/lib/countries";
-import { buildCsv, downloadCsv } from "@/lib/csv";
+import { buildComparisonCsv, downloadCsv } from "@/lib/csv";
 import { deriveScatterEvidenceGap } from "@/lib/evidence-gaps";
 
 type Scatter2DCardProps = {
@@ -72,26 +72,14 @@ export function Scatter2DCard({
   const exportFileName = `${xLabel.toLowerCase().replace(/\s+/g, "-")}-${yLabel.toLowerCase().replace(/\s+/g, "-")}-comparison.csv`;
 
   function handleCsvDownload() {
-    const csv = buildCsv(
-      [
-        "id",
-        lowerSingular,
-        adminLabels.middle?.singular ?? "District",
-        higherSingular,
-        xLabel,
-        yLabel,
-        "selected",
-      ],
-      points.map((point) => [
-        point.id,
-        point.label,
-        point.district,
-        point.province,
-        point.x,
-        point.y,
-        point.selected,
-      ]),
-    );
+    const csv = buildComparisonCsv({
+      lowerLabel: lowerSingular,
+      middleLabel: adminLabels.middle?.singular ?? null,
+      higherLabel: higherSingular,
+      xLabel,
+      yLabel,
+      points,
+    });
 
     downloadCsv(exportFileName, csv);
   }
