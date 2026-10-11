@@ -472,7 +472,10 @@ async function runIndicatorNarrativeStage(
   });
 }
 
-async function getProvinceDocumentContext(context: AiPipelineContext) {
+async function getProvinceDocumentContext(
+  context: AiPipelineContext,
+  { forceRefresh = false }: { forceRefresh?: boolean } = {},
+) {
   const chosen = chooseProvincePlanUrl(context);
 
   if (!chosen) {
@@ -485,6 +488,7 @@ async function getProvinceDocumentContext(context: AiPipelineContext) {
       context.country.code,
       context.localPlanUnitName,
       context.localPlanUnitLabel,
+      { forceRefresh },
     );
     return {
       document: direct.context,
@@ -599,7 +603,9 @@ async function runProvincePlanStage(
         throw new Error(`No local/SNG plan URL is available for ${context.localPlanUnitName}.`);
       }
 
-      const { document, sourceReferences } = await getProvinceDocumentContext(context);
+      const { document, sourceReferences } = await getProvinceDocumentContext(context, {
+        forceRefresh: mode === "regenerate",
+      });
       const stageOutput = buildDocumentStageOutput(
         document,
         `${context.localPlanUnitName} local/SNG plan`,
@@ -663,6 +669,7 @@ async function runNationalPlanStage(
       const { context: document, sources } = await getNationalPlanContext(
         context.country.code,
         context.score.id,
+        { forceRefresh: mode === "regenerate" },
       );
       const stageOutput = buildDocumentStageOutput(
         document,
