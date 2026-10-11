@@ -1,6 +1,8 @@
+import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import Module from "node:module";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
@@ -10,6 +12,191 @@ import {
 } from "../src/lib/data/release-membership.ts";
 
 const root = process.cwd();
+
+function runGeometryScenario(scenario) {
+  const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "ldt-geometry-test-"));
+  const generatedPath = "src/generated/analytics-data.json";
+  const mapPath = "public/data/nepal-municipalities.geojson";
+
+  try {
+    const fallback = JSON.parse(
+      fs.readFileSync(path.join(root, generatedPath), "utf8"),
+    );
+    const canonical = fallback.municipalities.find((row) => row.year === 2025);
+    assert.ok(canonical);
+    const maps = JSON.parse(fs.readFileSync(path.join(root, mapPath), "utf8"));
+    const canonicalFeature = maps.features.find(
+      (row) => row.properties.compositeKey === canonical.compositeKey,
+    );
+    assert.ok(canonicalFeature);
+    const features =
+      scenario === "null-canonical-geometry"
+        ? [{ ...canonicalFeature, geometry: null }]
+        : scenario === "mixed-duplicate-canonical-geometry"
+          ? [canonicalFeature, { ...canonicalFeature, geometry: null }]
+        : [];
+
+    fs.mkdirSync(path.dirname(path.join(fixtureDirectory, generatedPath)), {
+      recursive: true,
+    });
+    fs.mkdirSync(path.dirname(path.join(fixtureDirectory, mapPath)), {
+      recursive: true,
+    });
+    fs.copyFileSync(
+      path.join(root, generatedPath),
+      path.join(fixtureDirectory, generatedPath),
+    );
+    fs.writeFileSync(
+      path.join(fixtureDirectory, mapPath),
+      JSON.stringify({ type: "FeatureCollection", features }),
+    );
+
+    const script = `
+const Module = require("node:module");
+const path = require("node:path");
+const root = ${JSON.stringify(root)};
+const request = Module.createRequire(path.join(root, "package.json"));
+const typescript = request("typescript");
+const oldResolve = Module._resolveFilename;
+Module._resolveFilename = function resolveFilename(specifier, parent, ...rest) {
+  if (specifier === "server-only") {
+    specifier = path.join(root, "node_modules/next/dist/compiled/server-only/empty.js");
+  }
+  if (specifier.startsWith("@/")) {
+    specifier = path.join(root, "src", specifier.slice(2));
+  }
+  return oldResolve.call(this, specifier, parent, ...rest);
+};
+for (const extension of [".ts", ".tsx"]) {
+  Module._extensions[extension] = (module, filename) => {
+    const result = typescript.transpileModule(require("node:fs").readFileSync(filename, "utf8"), {
+      fileName: filename,
+      compilerOptions: {
+        target: typescript.ScriptTarget.ES2022,
+        module: typescript.ModuleKind.CommonJS,
+        jsx: typescript.JsxEmit.ReactJSX,
+        esModuleInterop: true,
+      },
+    });
+    module._compile(result.outputText, filename);
+  };
+}
+const canonical = ${JSON.stringify(canonical)};
+const municipality = {
+  id: "canonical-id",
+  country_code: "NPL",
+  municipality: canonical.municipality,
+  district: canonical.district,
+  province: canonical.province,
+  municipality_slug: canonical.slug.municipality,
+  district_slug: canonical.slug.district,
+  province_slug: canonical.slug.province,
+  composite_key: canonical.compositeKey,
+};
+const scoreDefinitions = ["infrastructure", "livability", "prosperity"].map((pillar, index) => ({
+  id: pillar + "_score",
+  canonical_name: pillar + " score",
+  pillar,
+  description: null,
+  component_score_keys: [],
+  display_order: index,
+}));
+const tables = {
+  dataset_releases: [{
+    id: "release",
+    country_code: "NPL",
+    release_key: "npl-2025-v1",
+    year: 2025,
+    label: "Nepal 2025",
+    is_active: true,
+    created_at: "2026-10-11T00:00:00Z",
+  }],
+  municipalities: [municipality],
+  score_definitions: scoreDefinitions,
+  indicators: [],
+  score_components: [],
+  municipality_score_values: scoreDefinitions.map((row) => ({
+    municipality_id: municipality.id,
+    score_id: row.id,
+    score_value: 40,
+  })),
+};
+process.env.NEXT_PUBLIC_SUPABASE_URL = "https://geometry-fixture.supabase.test";
+process.env.SUPABASE_SERVICE_ROLE_KEY = "geometry-fixture-key";
+globalThis.fetch = async (input) => {
+  const table = new URL(typeof input === "string" ? input : input.url).pathname.split("/").at(-1);
+  if (table === "municipality_boundaries") {
+    return new Response(null, { status: 200, headers: { "content-range": "0-0/3" } });
+  }
+  if (table === "municipality_score_component_values" || table === "municipality_context_values") {
+    return new Response(JSON.stringify({ code: "PGRST205", message: "Absent fixture relation" }), {
+      status: 404,
+      headers: { "content-type": "application/json" },
+    });
+  }
+  return new Response(JSON.stringify(tables[table] ?? []), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+};
+(async () => {
+  const { getAnalyticsPageData } = request(path.join(root, "src/lib/data/queries.ts"));
+  const data = await getAnalyticsPageData(
+    { tab: "single", year: "2025", metric: "infrastructure_score" },
+    "NPL",
+  );
+  process.stdout.write(JSON.stringify({
+    coverage: data.coverage,
+    renderedFeatures: data.map.features.length,
+    nullGeometryFeatures: data.map.features.filter((row) => !row.geometry).length,
+    coverageLabel: data.map.coverageLabel,
+    recordMapAvailable: data.municipality.mapAvailable,
+  }) + "\\n");
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
+`;
+
+    return JSON.parse(
+      execFileSync(process.execPath, ["-e", script], {
+        cwd: fixtureDirectory,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          NEXT_PUBLIC_SUPABASE_URL: "https://geometry-fixture.supabase.test",
+          SUPABASE_SERVICE_ROLE_KEY: "geometry-fixture-key",
+        },
+      }).trim(),
+    );
+  } finally {
+    fs.rmSync(fixtureDirectory, { recursive: true, force: true });
+  }
+}
+
+for (const scenario of ["null-canonical-geometry", "absent-canonical-geometry"]) {
+  test(`${scenario} is excluded from renderable map data consistently`, () => {
+    const result = runGeometryScenario(scenario);
+
+    assert.equal(result.renderedFeatures, 0);
+    assert.equal(result.nullGeometryFeatures, 0);
+    assert.equal(result.coverage.mapMunicipalityCount, 0);
+    assert.equal(result.coverage.analyticsOnlyCount, 1);
+    assert.equal(result.coverageLabel, "0 mapped of 1 analytics municipalities");
+    assert.equal(result.recordMapAvailable, false);
+  });
+}
+
+test("mixed canonical geometry duplicates emit only valid map features", () => {
+  const result = runGeometryScenario("mixed-duplicate-canonical-geometry");
+
+  assert.equal(result.renderedFeatures, 1);
+  assert.equal(result.nullGeometryFeatures, 0);
+  assert.equal(result.coverage.mapMunicipalityCount, 1);
+  assert.equal(result.coverage.analyticsOnlyCount, 0);
+  assert.equal(result.coverageLabel, "1 mapped of 1 analytics municipalities");
+  assert.equal(result.recordMapAvailable, true);
+});
 
 test("release membership follows bundled release identity and selected-year fallback", () => {
   const membership = buildReleaseMunicipalityMembership(
@@ -100,7 +287,7 @@ function jsonResponse(data, status = 200, headers = {}) {
   });
 }
 
-function createSupabaseFixture({ releases, municipalities, scoreValues }) {
+function createSupabaseFixture({ releases, municipalities, scoreValues, boundaryCount }) {
   const requests = [];
   const tables = {
     dataset_releases: releases,
@@ -150,7 +337,7 @@ function createSupabaseFixture({ releases, municipalities, scoreValues }) {
     if (table === "municipality_boundaries") {
       return new Response(null, {
         status: 200,
-        headers: { "content-range": `0-0/${municipalities.length}` },
+        headers: { "content-range": `0-0/${boundaryCount ?? municipalities.length}` },
       });
     }
 
@@ -164,7 +351,7 @@ function createSupabaseFixture({ releases, municipalities, scoreValues }) {
   return { fetchFixture, requests };
 }
 
-function createReleaseBoundaryFixture({ releaseKey, extraProvince }) {
+function createReleaseBoundaryFixture({ releaseKey, extraProvince, boundaryCount }) {
   const fallback = JSON.parse(
     fs.readFileSync(path.join(root, "src/generated/analytics-data.json"), "utf8"),
   );
@@ -218,15 +405,16 @@ function createReleaseBoundaryFixture({ releaseKey, extraProvince }) {
   );
 
   return {
-    fixture: createSupabaseFixture({ releases, municipalities, scoreValues }),
+    fixture: createSupabaseFixture({ releases, municipalities, scoreValues, boundaryCount }),
     municipalities,
   };
 }
 
-async function runAnalyticsFixture({ releaseKey, extraProvince, searchParams }) {
+async function runAnalyticsFixture({ releaseKey, extraProvince, boundaryCount, searchParams }) {
   const { fixture, municipalities } = createReleaseBoundaryFixture({
     releaseKey,
     extraProvince,
+    boundaryCount,
   });
   const previousFetch = globalThis.fetch;
   const previousUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -266,6 +454,26 @@ test("same-year revised releases retain valid database municipalities", async ()
   assert.equal(data.nationalAverages.scores.infrastructure_score, 60);
   assert.equal(data.selected.municipalityId, "extra-id");
   assert.equal(data.municipality.id, "extra-id");
+});
+
+test("coverage counts selected-release geometries instead of stale boundary rows", async () => {
+  const { data } = await runAnalyticsFixture({
+    releaseKey: "npl-2025-v2",
+    boundaryCount: 3,
+    searchParams: {
+      tab: "single",
+      year: "2025",
+      municipality: "extra-id",
+    },
+  });
+
+  assert.equal(data.map.features.length, 1);
+  assert.equal(data.coverage.analyticsMunicipalityCount, 2);
+  assert.equal(data.coverage.mapMunicipalityCount, 1);
+  assert.equal(data.coverage.analyticsOnlyCount, 1);
+  assert.ok(data.coverage.analyticsOnlyCount >= 0);
+  assert.equal(data.coverage.boundaryOnlyCount, 20);
+  assert.equal(data.map.coverageLabel, "1 mapped of 2 analytics municipalities");
 });
 
 test("province filters use only municipalities retained for the selected release", async () => {
