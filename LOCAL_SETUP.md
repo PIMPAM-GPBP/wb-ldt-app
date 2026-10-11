@@ -41,6 +41,9 @@ To check production-mode behavior, run `npm run build`, then `npm start`.
 | `AI_ADMIN_TOKEN` | Optional server token for authorized production generation. |
 | `AI_PROMPT_VERSION`, `AI_INVALIDATION_VERSION` | Optional cache-version controls, defaulting to `v2` and `v1`. |
 
+AI cache and pipeline calls use the `v2` prompt-version default in [`src/lib/ai/cache.ts`](src/lib/ai/cache.ts).
+Generic AI error metadata uses `v1` when unset in [`src/app/api/ai/_utils.ts`](src/app/api/ai/_utils.ts).
+
 The project URL and database credential must belong to the same Supabase project.
 Account membership and application credentials are separate, so obtain both through the project owner.
 Retrieve keys through the project's API Keys settings using [Supabase's guide](https://supabase.com/docs/guides/getting-started/api-keys).
