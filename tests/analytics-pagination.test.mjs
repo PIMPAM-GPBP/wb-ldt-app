@@ -132,7 +132,7 @@ function createUnstablePaginationFixture() {
       left.component_id.localeCompare(right.component_id),
   );
   let unorderedRequestCount = 0;
-  const fetchFixture = async (input, init = {}) => {
+  const fetchFixture = async (input) => {
     const url = new URL(typeof input === "string" ? input : input.url);
     const table = url.pathname.split("/").at(-1);
     const { from, to } = getRange(input);

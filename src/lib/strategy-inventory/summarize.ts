@@ -4,7 +4,6 @@ import type {
   ReadinessStatusCount,
   StrategyInventoryRecord,
   StrategyInventorySummary,
-  StrategyInventorySummaryOverride,
 } from "./types.ts";
 
 export const READINESS_CATEGORIES: ReadonlyArray<ReadinessCategory> = [
@@ -18,7 +17,6 @@ export const READINESS_CATEGORIES: ReadonlyArray<ReadinessCategory> = [
 function lsgKey(value: Pick<StrategyInventoryRecord, "lsg_id" | "lsg_name"> | ExpectedLsg) {
   return (value.lsg_id || value.lsg_name).trim().toLowerCase();
 }
-
 function hasDocumentSource(record: StrategyInventoryRecord) {
   return record.source_status === "found" || record.source_status === "needs_validation";
 }
@@ -175,22 +173,5 @@ export function getStrategyInventorySummary(
     unknown_year_count: publicationYearCounts.get("Unknown") ?? 0,
     status_breakdown,
     latest_last_updated: latestLastUpdated(records),
-  };
-}
-
-export function getStrategyInventoryDisplaySummary(
-  records: StrategyInventoryRecord[],
-  expectedLsgs: number | ExpectedLsg[],
-  summaryOverride?: StrategyInventorySummaryOverride,
-): StrategyInventorySummary {
-  const summary = getStrategyInventorySummary(records, expectedLsgs);
-
-  if (!summaryOverride) {
-    return summary;
-  }
-
-  return {
-    ...summary,
-    ...summaryOverride,
   };
 }
