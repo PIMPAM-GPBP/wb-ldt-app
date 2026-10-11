@@ -100,7 +100,7 @@ function jsonResponse(data, status = 200, headers = {}) {
   });
 }
 
-function createSupabaseFixture({ releases, municipalities, scoreValues }) {
+function createSupabaseFixture({ releases, municipalities, scoreValues, boundaryCount }) {
   const requests = [];
   const tables = {
     dataset_releases: releases,
@@ -150,7 +150,7 @@ function createSupabaseFixture({ releases, municipalities, scoreValues }) {
     if (table === "municipality_boundaries") {
       return new Response(null, {
         status: 200,
-        headers: { "content-range": `0-0/${municipalities.length}` },
+        headers: { "content-range": `0-0/${boundaryCount ?? municipalities.length}` },
       });
     }
 
@@ -164,7 +164,7 @@ function createSupabaseFixture({ releases, municipalities, scoreValues }) {
   return { fetchFixture, requests };
 }
 
-function createReleaseBoundaryFixture({ releaseKey, extraProvince }) {
+function createReleaseBoundaryFixture({ releaseKey, extraProvince, boundaryCount }) {
   const fallback = JSON.parse(
     fs.readFileSync(path.join(root, "src/generated/analytics-data.json"), "utf8"),
   );
@@ -218,15 +218,16 @@ function createReleaseBoundaryFixture({ releaseKey, extraProvince }) {
   );
 
   return {
-    fixture: createSupabaseFixture({ releases, municipalities, scoreValues }),
+    fixture: createSupabaseFixture({ releases, municipalities, scoreValues, boundaryCount }),
     municipalities,
   };
 }
 
-async function runAnalyticsFixture({ releaseKey, extraProvince, searchParams }) {
+async function runAnalyticsFixture({ releaseKey, extraProvince, boundaryCount, searchParams }) {
   const { fixture, municipalities } = createReleaseBoundaryFixture({
     releaseKey,
     extraProvince,
+    boundaryCount,
   });
   const previousFetch = globalThis.fetch;
   const previousUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -266,6 +267,26 @@ test("same-year revised releases retain valid database municipalities", async ()
   assert.equal(data.nationalAverages.scores.infrastructure_score, 60);
   assert.equal(data.selected.municipalityId, "extra-id");
   assert.equal(data.municipality.id, "extra-id");
+});
+
+test("coverage counts selected-release geometries instead of stale boundary rows", async () => {
+  const { data } = await runAnalyticsFixture({
+    releaseKey: "npl-2025-v2",
+    boundaryCount: 3,
+    searchParams: {
+      tab: "single",
+      year: "2025",
+      municipality: "extra-id",
+    },
+  });
+
+  assert.equal(data.map.features.length, 1);
+  assert.equal(data.coverage.analyticsMunicipalityCount, 2);
+  assert.equal(data.coverage.mapMunicipalityCount, 1);
+  assert.equal(data.coverage.analyticsOnlyCount, 1);
+  assert.ok(data.coverage.analyticsOnlyCount >= 0);
+  assert.equal(data.coverage.boundaryOnlyCount, 20);
+  assert.equal(data.map.coverageLabel, "1 mapped of 2 analytics municipalities");
 });
 
 test("province filters use only municipalities retained for the selected release", async () => {
