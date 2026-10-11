@@ -185,6 +185,7 @@ function createUnstablePaginationFixture() {
   return {
     fetchFixture,
     municipalities,
+    releaseKey: releases[0].release_key,
     unorderedRequestCount: () => unorderedRequestCount,
   };
 }
@@ -204,12 +205,14 @@ test("AI context remains stable when paginated component pages are unordered ext
     );
     const first = await getAiPipelineContextForRequest({
       countryCode: "ZMB",
+      releaseKey: fixture.releaseKey,
       year: 2025,
       municipalityId: fixture.municipalities[0].id,
       scoreId: "prosperity_score",
     });
     const second = await getAiPipelineContextForRequest({
       countryCode: "ZMB",
+      releaseKey: fixture.releaseKey,
       year: 2025,
       municipalityId: fixture.municipalities[0].id,
       scoreId: "prosperity_score",
