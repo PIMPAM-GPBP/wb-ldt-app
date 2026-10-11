@@ -360,6 +360,8 @@ const loadScoreValuesForRelease = cache(async (releaseId: string, year: number) 
       .select("municipality_id, score_id, score_value")
       .eq("release_id", releaseId)
       .eq("year", year)
+      .order("municipality_id", { ascending: true })
+      .order("score_id", { ascending: true })
       .range(from, to),
   );
 });
@@ -375,6 +377,8 @@ const loadIndicatorValuesForRelease = cache(
         .eq("release_id", releaseId)
         .eq("year", year)
         .eq("indicator_id", indicatorId)
+        .order("municipality_id", { ascending: true })
+        .order("indicator_id", { ascending: true })
         .range(from, to),
     );
   },
@@ -409,6 +413,8 @@ const loadScoreComponentValuesForRelease = cache(async (releaseId: string, year:
         .select("municipality_id, component_id, score_value")
         .eq("release_id", releaseId)
         .eq("year", year)
+        .order("municipality_id", { ascending: true })
+        .order("component_id", { ascending: true })
         .range(from, to),
     );
   } catch (error) {
@@ -432,6 +438,7 @@ const loadContextValuesForRelease = cache(async (releaseId: string, year: number
         )
         .eq("release_id", releaseId)
         .eq("year", year)
+        .order("municipality_id", { ascending: true })
         .range(from, to),
     );
   } catch (error) {
