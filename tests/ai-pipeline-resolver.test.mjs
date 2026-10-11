@@ -1,3 +1,4 @@
+import "./support/register.mjs";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test, { after, before, beforeEach } from "node:test";
