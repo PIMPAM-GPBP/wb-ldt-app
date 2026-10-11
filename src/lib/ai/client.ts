@@ -32,6 +32,27 @@ const aiStageDownstream: Record<AiStageName, AiStageName[]> = {
 };
 
 export type AiStageRequestScope = Omit<AiStageRequestPayload, "mode">;
+export type AiStageResults = Partial<Record<AiStageName, AiStageResponsePayload>>;
+
+export type AiStageAction = {
+  readonly id: number;
+  readonly controller: AbortController;
+  results: AiStageResults;
+  inFlight: AiStageName | null;
+};
+
+export type AiStageActionResult = {
+  status: "applied" | "busy" | "stale";
+  response: AiStageResponsePayload | null;
+  results: AiStageResults;
+};
+
+export type AiStageActionCoordinator = {
+  begin(initialResults: AiStageResults): AiStageAction | null;
+  isCurrent(action: AiStageAction): boolean;
+  finish(action: AiStageAction): void;
+  cancel(): void;
+};
 
 type RequestAiStageOptions = {
   mode: AiStageRequestPayload["mode"];
@@ -83,6 +104,43 @@ export function toFailedAiStagePayload(
     promptVersion: "n/a",
     updatedAt: new Date().toISOString(),
     errorMessage,
+  };
+}
+
+export function createAiStageActionCoordinator(): AiStageActionCoordinator {
+  let nextActionId = 0;
+  let activeAction: AiStageAction | null = null;
+
+  return {
+    begin(initialResults) {
+      if (activeAction) {
+        return null;
+      }
+
+      const action: AiStageAction = {
+        id: ++nextActionId,
+        controller: new AbortController(),
+        results: { ...initialResults },
+        inFlight: null,
+      };
+      activeAction = action;
+      return action;
+    },
+
+    isCurrent(action) {
+      return activeAction?.id === action.id && !action.controller.signal.aborted;
+    },
+
+    finish(action) {
+      if (activeAction?.id === action.id) {
+        activeAction = null;
+      }
+    },
+
+    cancel() {
+      activeAction?.controller.abort();
+      activeAction = null;
+    },
   };
 }
 
@@ -188,6 +246,103 @@ export async function requestAiStage(
 
 export function isAiCacheMiss(response: AiStageResponsePayload) {
   return response.status === "failed" && response.errorMessage?.toLowerCase().includes("no cached");
+}
+
+export function prepareAiStageAction(
+  action: AiStageAction,
+  changedStage: AiStageName,
+) {
+  action.results = clearAiDownstreamResults(action.results, changedStage);
+  return action.results;
+}
+
+export async function runAiStageAction({
+  coordinator,
+  action,
+  stage,
+  mode,
+  scope,
+  baseUrl,
+}: {
+  coordinator: AiStageActionCoordinator;
+  action: AiStageAction;
+  stage: AiStageName;
+  mode: AiStageRequestPayload["mode"];
+  scope: AiStageRequestScope;
+  baseUrl?: string;
+}): Promise<AiStageActionResult> {
+  if (!coordinator.isCurrent(action)) {
+    return {
+      status: "stale",
+      response: null,
+      results: action.results,
+    };
+  }
+
+  if (action.inFlight) {
+    return {
+      status: "busy",
+      response: null,
+      results: action.results,
+    };
+  }
+
+  action.inFlight = stage;
+  if (mode === "generate" || mode === "regenerate") {
+    prepareAiStageAction(action, stage);
+  }
+
+  try {
+    const response = await requestAiStage(stage, scope, {
+      mode,
+      baseUrl,
+      signal: action.controller.signal,
+    });
+
+    if (!coordinator.isCurrent(action)) {
+      return {
+        status: "stale",
+        response: null,
+        results: action.results,
+      };
+    }
+
+    action.results = {
+      ...action.results,
+      [stage]: response,
+    };
+    return {
+      status: "applied",
+      response,
+      results: action.results,
+    };
+  } catch (error) {
+    if (!coordinator.isCurrent(action) || isAbortError(error)) {
+      return {
+        status: "stale",
+        response: null,
+        results: action.results,
+      };
+    }
+
+    const response = toFailedAiStagePayload(stage, {
+      error: error instanceof Error ? error.message : "The AI stage request failed.",
+    });
+    prepareAiStageAction(action, stage);
+    action.results = {
+      ...action.results,
+      [stage]: response,
+    };
+    return {
+      status: "applied",
+      response,
+      results: action.results,
+    };
+  } finally {
+    if (action.inFlight === stage) {
+      action.inFlight = null;
+    }
+  }
 }
 
 async function loadCachedStage(

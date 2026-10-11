@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 import { AiIndicatorChart } from "@/components/analytics/ai-indicator-chart";
 import {
@@ -17,12 +16,15 @@ import {
 import type { RegionalIndicatorRow } from "@/components/analytics/ai-result-renderers";
 import { AiStageCard } from "@/components/analytics/ai-stage-card";
 import {
-  clearAiDownstreamResults,
+  createAiStageActionCoordinator,
   hydrateAiStageResults,
-  requestAiStage,
-  toFailedAiStagePayload,
+  prepareAiStageAction,
+  runAiStageAction,
 } from "@/lib/ai/client";
-import type { AiStageRequestScope } from "@/lib/ai/client";
+import type {
+  AiStageAction,
+  AiStageResults,
+} from "@/lib/ai/client";
 import { buildAiBriefMarkdownExport } from "@/lib/ai/export";
 import type {
   AiStageName,
@@ -360,82 +362,7 @@ function PlanningEvidencePanel({
   );
 }
 
-type AiStageResults = Partial<Record<AiStageName, AiStageResponsePayload>>;
 type AiStageLoading = Partial<Record<AiStageName, string>>;
-
-async function runAiStageRequest({
-  stage,
-  mode,
-  basePayload,
-  hydrationControllerRef,
-  activeRequestControllersRef,
-  scopeVersionRef,
-  setHydrationError,
-  setIsHydrating,
-  setLoadingStages,
-  setStageResults,
-}: {
-  stage: AiStageName;
-  mode: "generate" | "regenerate" | "load_cached";
-  basePayload: AiStageRequestScope;
-  hydrationControllerRef: MutableRefObject<AbortController | null>;
-  activeRequestControllersRef: MutableRefObject<Set<AbortController>>;
-  scopeVersionRef: MutableRefObject<number>;
-  setHydrationError: Dispatch<SetStateAction<string | null>>;
-  setIsHydrating: Dispatch<SetStateAction<boolean>>;
-  setLoadingStages: Dispatch<SetStateAction<AiStageLoading>>;
-  setStageResults: Dispatch<SetStateAction<AiStageResults>>;
-}): Promise<AiStageResponsePayload | null> {
-  hydrationControllerRef.current?.abort();
-  hydrationControllerRef.current = null;
-  setIsHydrating(false);
-  setHydrationError(null);
-
-  const controller = new AbortController();
-  const scopeVersion = scopeVersionRef.current;
-  activeRequestControllersRef.current.add(controller);
-  setLoadingStages((current) => ({ ...current, [stage]: mode }));
-
-  try {
-    const payload = await requestAiStage(stage, basePayload, {
-      mode,
-      signal: controller.signal,
-    });
-
-    if (controller.signal.aborted || scopeVersionRef.current !== scopeVersion) {
-      return null;
-    }
-
-    setStageResults((current) => {
-      const next =
-        mode === "generate" || mode === "regenerate"
-          ? clearAiDownstreamResults(current, stage)
-          : { ...current };
-      next[stage] = payload;
-      return next;
-    });
-
-    return payload;
-  } catch (error) {
-    if (controller.signal.aborted || scopeVersionRef.current !== scopeVersion) {
-      return null;
-    }
-
-    const message = error instanceof Error ? error.message : "The AI stage request failed.";
-    const payload = toFailedAiStagePayload(stage, { error: message });
-    setStageResults((current) => ({ ...current, [stage]: payload }));
-    return payload;
-  } finally {
-    activeRequestControllersRef.current.delete(controller);
-    if (!controller.signal.aborted && scopeVersionRef.current === scopeVersion) {
-      setLoadingStages((current) => {
-        const next = { ...current };
-        delete next[stage];
-        return next;
-      });
-    }
-  }
-}
 
 export function AiAnalyticsTab({
   release,
@@ -449,10 +376,11 @@ export function AiAnalyticsTab({
   const [loadingStages, setLoadingStages] = useState<AiStageLoading>({});
   const [hydrationError, setHydrationError] = useState<string | null>(null);
   const [isHydrating, setIsHydrating] = useState(false);
+  const [isExplicitActionRunning, setIsExplicitActionRunning] = useState(false);
   const [hydrationAttempt, setHydrationAttempt] = useState(0);
   const hydrationControllerRef = useRef<AbortController | null>(null);
-  const activeRequestControllersRef = useRef<Set<AbortController>>(new Set());
   const scopeVersionRef = useRef(0);
+  const actionCoordinator = useMemo(() => createAiStageActionCoordinator(), []);
 
   const basePayload = useMemo(
     () => ({
@@ -468,7 +396,6 @@ export function AiAnalyticsTab({
   useEffect(() => {
     const controller = new AbortController();
     const scopeVersion = ++scopeVersionRef.current;
-    const activeRequestControllers = activeRequestControllersRef.current;
     hydrationControllerRef.current = controller;
 
     queueMicrotask(() => {
@@ -507,33 +434,90 @@ export function AiAnalyticsTab({
 
     return () => {
       controller.abort();
-      for (const activeController of activeRequestControllers) {
-        activeController.abort();
-      }
+      actionCoordinator.cancel();
       if (hydrationControllerRef.current === controller) {
         hydrationControllerRef.current = null;
       }
       scopeVersionRef.current += 1;
     };
-  }, [basePayload, hydrationAttempt]);
+  }, [actionCoordinator, basePayload, hydrationAttempt]);
+
+  const beginExplicitAction = useCallback(() => {
+    const action = actionCoordinator.begin(stageResults);
+
+    if (!action) {
+      return null;
+    }
+
+    hydrationControllerRef.current?.abort();
+    hydrationControllerRef.current = null;
+    setIsHydrating(false);
+    setHydrationError(null);
+    setIsExplicitActionRunning(true);
+    return action;
+  }, [actionCoordinator, stageResults]);
+
+  const finishExplicitAction = useCallback((action: AiStageAction) => {
+    if (!actionCoordinator.isCurrent(action)) {
+      return;
+    }
+
+    actionCoordinator.finish(action);
+    setIsExplicitActionRunning(false);
+  }, [actionCoordinator]);
 
   const runStage = useCallback(async function runStage(
     stage: AiStageName,
     mode: "generate" | "regenerate" | "load_cached",
+    action?: AiStageAction,
   ): Promise<AiStageResponsePayload | null> {
-    return runAiStageRequest({
-      stage,
-      mode,
-      basePayload,
-      hydrationControllerRef,
-      activeRequestControllersRef,
-      scopeVersionRef,
-      setHydrationError,
-      setIsHydrating,
-      setLoadingStages,
-      setStageResults,
-    });
-  }, [basePayload]);
+    const ownsAction = !action;
+    const currentAction = action ?? beginExplicitAction();
+
+    if (!currentAction) {
+      return null;
+    }
+
+    if (!actionCoordinator.isCurrent(currentAction)) {
+      return null;
+    }
+
+    setLoadingStages((current) => ({ ...current, [stage]: mode }));
+    setStageResults(prepareAiStageAction(currentAction, stage));
+
+    try {
+      const result = await runAiStageAction({
+        coordinator: actionCoordinator,
+        action: currentAction,
+        stage,
+        mode,
+        scope: basePayload,
+      });
+
+      if (result.status === "applied" && actionCoordinator.isCurrent(currentAction)) {
+        setStageResults(result.results);
+      }
+
+      return result.response;
+    } finally {
+      if (actionCoordinator.isCurrent(currentAction)) {
+        setLoadingStages((current) => {
+          const next = { ...current };
+          delete next[stage];
+          return next;
+        });
+      }
+
+      if (ownsAction) {
+        finishExplicitAction(currentAction);
+      }
+    }
+  }, [
+    actionCoordinator,
+    basePayload,
+    beginExplicitAction,
+    finishExplicitAction,
+  ]);
 
   const hasIndicatorNarrative = stageResults.indicator_narrative?.status === "completed";
   const hasAlignment = stageResults.plan_alignment?.status === "completed";
@@ -610,21 +594,30 @@ export function AiAnalyticsTab({
   }
 
   async function runPlanningContext(mode: "generate" | "regenerate") {
-    const nationalContext = await runStage("national_plan_context", mode);
-    if (nationalContext?.status !== "completed") {
+    const action = beginExplicitAction();
+    if (!action) {
       return;
     }
 
-    if (!ai.localPlanAvailable) {
-      return;
-    }
+    try {
+      const nationalContext = await runStage("national_plan_context", mode, action);
+      if (nationalContext?.status !== "completed") {
+        return;
+      }
 
-    const provinceContext = await runStage("province_plan_context", mode);
-    if (provinceContext?.status !== "completed") {
-      return;
-    }
+      if (!ai.localPlanAvailable) {
+        return;
+      }
 
-    await runStage("plan_alignment", mode);
+      const provinceContext = await runStage("province_plan_context", mode, action);
+      if (provinceContext?.status !== "completed") {
+        return;
+      }
+
+      await runStage("plan_alignment", mode, action);
+    } finally {
+      finishExplicitAction(action);
+    }
   }
 
   function buildStageActions(stage: AiStageName, disabled: boolean) {
@@ -633,13 +626,13 @@ export function AiAnalyticsTab({
         <StageButton
           label={loadingStages[stage] ? "Working..." : "Run step"}
           onClick={() => void runStage(stage, "generate")}
-          disabled={Boolean(loadingStages[stage]) || disabled}
+          disabled={isExplicitActionRunning || Boolean(loadingStages[stage]) || disabled}
           tone="primary"
         />
         <StageButton
           label={loadingStages[stage] ? "Working..." : "Regenerate"}
           onClick={() => void runStage(stage, "regenerate")}
-          disabled={Boolean(loadingStages[stage]) || disabled}
+          disabled={isExplicitActionRunning || Boolean(loadingStages[stage]) || disabled}
         />
       </>
     );
@@ -654,13 +647,13 @@ export function AiAnalyticsTab({
       <StageButton
         label={isLoading ? "Working..." : "Regenerate analysis"}
         onClick={() => void runStage(stage, "regenerate")}
-        disabled={isLoading}
+        disabled={isExplicitActionRunning || isLoading}
       />
     ) : (
       <StageButton
         label={isLoading ? "Working..." : "Run analysis"}
         onClick={() => void runStage(stage, "generate")}
-        disabled={isLoading}
+        disabled={isExplicitActionRunning || isLoading}
         tone="primary"
       />
     );
@@ -735,7 +728,7 @@ export function AiAnalyticsTab({
           <StageButton
             label="Download brief"
             onClick={downloadAiBrief}
-            disabled={!hasAnyStageResult}
+            disabled={!hasAnyStageResult || isExplicitActionRunning}
           />
         }
       >
@@ -799,7 +792,7 @@ export function AiAnalyticsTab({
           <StageButton
             label={isHydrating ? "Retrying..." : "Retry saved results"}
             onClick={retryHydration}
-            disabled={isHydrating}
+            disabled={isHydrating || isExplicitActionRunning}
           />
         </div>
       ) : null}
@@ -851,13 +844,14 @@ export function AiAnalyticsTab({
                     : "Run national context"
               }
               onClick={() => void runPlanningContext("generate")}
-              disabled={isPlanningContextLoading}
+              disabled={isExplicitActionRunning || isPlanningContextLoading}
               tone="primary"
             />
             <StageButton
               label={isPlanningContextLoading ? "Working..." : "Regenerate alignment"}
               onClick={() => void runPlanningContext("regenerate")}
               disabled={
+                isExplicitActionRunning ||
                 isPlanningContextLoading ||
                 !hasAnyPlanningContextResult ||
                 !ai.localPlanAvailable
