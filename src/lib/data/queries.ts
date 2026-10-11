@@ -529,8 +529,10 @@ function buildMapFeatures(
   featureCollection: MapFeatureCollection,
   municipalitiesByCompositeKey: Map<string, MunicipalityRecord>,
   metric: MetricDefinition,
+  renderableMapMunicipalityKeys: ReadonlySet<string>,
 ) {
   return featureCollection.features
+    .filter((feature) => renderableMapMunicipalityKeys.has(feature.properties.compositeKey))
     .map((feature) => {
       const municipality = municipalitiesByCompositeKey.get(feature.properties.compositeKey);
       if (!municipality) {
@@ -761,8 +763,6 @@ export async function getAnalyticsPageData(
       bundledReleaseKey: localFallback.release.key,
     },
   );
-  const fallbackMapFeatureKeys = new Set(localFallback.mapFeatureKeys);
-
   const scoreDefinitions = baseData.scoreDefinitions.map((definition) => {
     const fallback = fallbackScoreDefinitionsById.get(definition.id);
     const componentRows = scoreComponentRowsByParentId.get(definition.id) ?? [];
@@ -875,7 +875,7 @@ export async function getAnalyticsPageData(
         province: municipality.province_slug,
       },
       year: selectedYear,
-      mapAvailable: fallbackMapFeatureKeys.has(municipality.composite_key),
+      mapAvailable: false as boolean,
       indicators,
       scoreComponents:
         scoreComponentIndex.get(municipality.id) ?? fallback?.scoreComponents ?? {},
@@ -927,16 +927,21 @@ export async function getAnalyticsPageData(
   const municipalitiesByCompositeKey = new Map(
     municipalitiesForYear.map((municipality) => [municipality.compositeKey, municipality]),
   );
-  const mapMunicipalityCount = getRenderableMapMunicipalityKeys(
+  const renderableMapMunicipalityKeys = getRenderableMapMunicipalityKeys(
     featureCollection,
     municipalitiesByCompositeKey,
-  ).size;
+  );
+  for (const municipality of municipalitiesForYear) {
+    municipality.mapAvailable = renderableMapMunicipalityKeys.has(municipality.compositeKey);
+  }
+  const mapMunicipalityCount = renderableMapMunicipalityKeys.size;
 
   const mapFeatures = shouldBuildMapData
     ? buildMapFeatures(
         featureCollection,
         municipalitiesByCompositeKey,
         selectedMapMetric,
+        renderableMapMunicipalityKeys,
       ).filter((feature) =>
         selectedProvince === "all"
           ? true
