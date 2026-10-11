@@ -3,15 +3,15 @@ export type ReleaseMunicipality = {
   compositeKey: string;
 };
 
-export type ReleaseMunicipalityMembership = {
+export type ReleaseMunicipalityMembership<T extends ReleaseMunicipality = ReleaseMunicipality> = {
   keys: ReadonlySet<string> | null;
-  byCompositeKey: ReadonlyMap<string, ReleaseMunicipality>;
+  byCompositeKey: ReadonlyMap<string, T>;
 };
 
-export function buildReleaseMunicipalityMembership(
-  municipalities: readonly ReleaseMunicipality[],
+export function buildReleaseMunicipalityMembership<T extends ReleaseMunicipality>(
+  municipalities: readonly T[],
   year: number,
-): ReleaseMunicipalityMembership {
+): ReleaseMunicipalityMembership<T> {
   const rowsForYear = municipalities.filter((municipality) => municipality.year === year);
 
   if (rowsForYear.length === 0) {

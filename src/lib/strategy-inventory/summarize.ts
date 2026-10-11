@@ -17,6 +17,7 @@ export const READINESS_CATEGORIES: ReadonlyArray<ReadinessCategory> = [
 function lsgKey(value: Pick<StrategyInventoryRecord, "lsg_id" | "lsg_name"> | ExpectedLsg) {
   return (value.lsg_id || value.lsg_name).trim().toLowerCase();
 }
+
 function hasDocumentSource(record: StrategyInventoryRecord) {
   return record.source_status === "found" || record.source_status === "needs_validation";
 }
