@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import test, { after, before, beforeEach } from "node:test";
 
@@ -91,7 +92,9 @@ const oldProvinceContext = {
   passages: [],
   chunks: [],
   extraction_metadata: { fixture: "stored" },
-  content_fingerprint: "stored-province-fingerprint",
+  content_fingerprint: createHash("sha256")
+    .update("stored document revision with current evidence.")
+    .digest("hex"),
   extraction_version: "v2",
 };
 
@@ -211,7 +214,16 @@ before(async () => {
 
     if (table === "ai_document_contexts") {
       if (requestUrl.searchParams.has("content_fingerprint")) {
-        return sendJson(response, []);
+        const contentFingerprint = queryValue(
+          requestUrl.searchParams,
+          "content_fingerprint",
+        );
+        return sendJson(
+          response,
+          documentContexts.filter(
+            (context) => context.content_fingerprint === contentFingerprint,
+          ),
+        );
       }
 
       const sourceType = queryValue(requestUrl.searchParams, "source_type");
@@ -315,6 +327,21 @@ test("province force refresh fetches the selected URL before content reuse", asy
   assert.match(result.context.extractedText, /revised document revision/);
   assert.deepEqual(documentFetchUrls, ["/fixture-province-plan.html"]);
   assert.deepEqual(writes.map(({ table }) => table), ["ai_document_contexts"]);
+});
+
+test("force refresh reuses an existing context after fetching unchanged content", async () => {
+  documentRevision = "stored";
+
+  const result = await getProvincePlanContext(
+    "ZMB",
+    "Chadiza",
+    "local/SNG plan unit",
+    { forceRefresh: true },
+  );
+
+  assert.equal(result.context.extractedText, oldProvinceContext.extracted_text);
+  assert.deepEqual(documentFetchUrls, ["/fixture-province-plan.html"]);
+  assert.deepEqual(writes, []);
 });
 
 test("national force refresh fetches the selected URL before content reuse", async () => {
