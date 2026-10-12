@@ -129,7 +129,10 @@ export function AnalyticsFilters({
           </CardAction>
         </CardHeader>
         <CardContent>
-          <form className={`grid gap-4 ${isSidebar ? "" : "xl:grid-cols-[repeat(3,minmax(0,1fr))_auto]"}`}>
+          <form
+            key={`${selected.year}:${selected.province}:${selected.municipalityId}`}
+            className={`grid gap-4 ${isSidebar ? "" : "xl:grid-cols-[repeat(3,minmax(0,1fr))_auto]"}`}
+          >
             <input type="hidden" name="tab" value={selectedTab} />
             <input type="hidden" name="metric" value={selected.metricId} />
             <input type="hidden" name="x" value={selected.xMetricId} />

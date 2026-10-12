@@ -21,6 +21,10 @@ import type {
 
 const DOCUMENT_EXTRACTION_VERSION = "v2";
 
+type DocumentContextOptions = {
+  forceRefresh?: boolean;
+};
+
 let pdfParseModulePromise: Promise<typeof import("pdf-parse")> | null = null;
 
 async function loadPdfParseModule() {
@@ -94,8 +98,6 @@ function isMissingRelationError(error: unknown) {
   return code === "PGRST205" || code === "42P01";
 }
 
-const planDocumentSourcesCache = new Map<AiDocumentContext["countryCode"], PlanDocumentSource[]>();
-
 function getScoreThemeFromScoreId(scoreId: string) {
   const normalized = scoreId.toLowerCase();
 
@@ -117,12 +119,6 @@ function getScoreThemeFromScoreId(scoreId: string) {
 async function loadPlanDocumentSources(
   countryCode: AiDocumentContext["countryCode"],
 ): Promise<PlanDocumentSource[]> {
-  const cached = planDocumentSourcesCache.get(countryCode);
-
-  if (cached) {
-    return cached;
-  }
-
   const supabase = getSupabaseServerClient().schema("analytics");
   const { data, error } = await supabase
     .from("plan_document_sources")
@@ -161,7 +157,6 @@ async function loadPlanDocumentSources(
     );
   }
 
-  planDocumentSourcesCache.set(countryCode, sources);
   return sources;
 }
 
@@ -258,6 +253,7 @@ function buildNationalSourceCollectionPath(
 export async function getNationalPlanContext(
   countryCode: AiDocumentContext["countryCode"],
   scoreId?: string,
+  { forceRefresh = false }: DocumentContextOptions = {},
 ): Promise<{
   context: AiDocumentContext;
   sources: NationalPlanSource[];
@@ -265,35 +261,37 @@ export async function getNationalPlanContext(
   const sources = await loadNationalPlanSources(countryCode, scoreId);
   const sourceCollectionPath = buildNationalSourceCollectionPath(countryCode, sources);
   const sourceFingerprint = toFingerprint(sources.map((source) => source.link).join("||"));
-  const latestCached = await loadLatestDocumentContextBySource(
-    countryCode,
-    "national_plan",
-    null,
-    sourceCollectionPath,
-    DOCUMENT_EXTRACTION_VERSION,
-  );
+  if (!forceRefresh) {
+    const latestCached = await loadLatestDocumentContextBySource(
+      countryCode,
+      "national_plan",
+      null,
+      sourceCollectionPath,
+      DOCUMENT_EXTRACTION_VERSION,
+    );
 
-  if (latestCached) {
-    return {
-      context: latestCached,
-      sources,
-    };
-  }
+    if (latestCached) {
+      return {
+        context: latestCached,
+        sources,
+      };
+    }
 
-  const cached = await loadDocumentContext(
-    countryCode,
-    "national_plan",
-    null,
-    sourceCollectionPath,
-    sourceFingerprint,
-    DOCUMENT_EXTRACTION_VERSION,
-  );
+    const cached = await loadDocumentContext(
+      countryCode,
+      "national_plan",
+      null,
+      sourceCollectionPath,
+      sourceFingerprint,
+      DOCUMENT_EXTRACTION_VERSION,
+    );
 
-  if (cached) {
-    return {
-      context: cached,
-      sources,
-    };
+    if (cached) {
+      return {
+        context: cached,
+        sources,
+      };
+    }
   }
 
   const extractedDocuments = await Promise.all(
@@ -373,6 +371,7 @@ export async function getProvincePlanContext(
   countryCode: AiDocumentContext["countryCode"],
   province: string,
   planUnitLabel = "local/SNG plan unit",
+  { forceRefresh = false }: DocumentContextOptions = {},
 ): Promise<{
   context: AiDocumentContext;
   candidates: ProvincePlanCandidate[];
@@ -385,35 +384,37 @@ export async function getProvincePlanContext(
   }
 
   const sourceUrlOrPath = chosen.link;
-  const latestCached = await loadLatestDocumentContextBySource(
-    countryCode,
-    "province_plan",
-    province,
-    sourceUrlOrPath,
-    DOCUMENT_EXTRACTION_VERSION,
-  );
+  if (!forceRefresh) {
+    const latestCached = await loadLatestDocumentContextBySource(
+      countryCode,
+      "province_plan",
+      province,
+      sourceUrlOrPath,
+      DOCUMENT_EXTRACTION_VERSION,
+    );
 
-  if (latestCached) {
-    return {
-      context: latestCached,
-      candidates,
-    };
-  }
+    if (latestCached) {
+      return {
+        context: latestCached,
+        candidates,
+      };
+    }
 
-  const cached = await loadDocumentContext(
-    countryCode,
-    "province_plan",
-    province,
-    sourceUrlOrPath,
-    toFingerprint(sourceUrlOrPath),
-    DOCUMENT_EXTRACTION_VERSION,
-  );
+    const cached = await loadDocumentContext(
+      countryCode,
+      "province_plan",
+      province,
+      sourceUrlOrPath,
+      toFingerprint(sourceUrlOrPath),
+      DOCUMENT_EXTRACTION_VERSION,
+    );
 
-  if (cached) {
-    return {
-      context: cached,
-      candidates,
-    };
+    if (cached) {
+      return {
+        context: cached,
+        candidates,
+      };
+    }
   }
 
   const extractedText = await parseRemoteDocument(sourceUrlOrPath);

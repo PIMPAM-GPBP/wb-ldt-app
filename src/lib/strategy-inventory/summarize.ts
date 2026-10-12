@@ -4,7 +4,6 @@ import type {
   ReadinessStatusCount,
   StrategyInventoryRecord,
   StrategyInventorySummary,
-  StrategyInventorySummaryOverride,
 } from "./types.ts";
 
 export const READINESS_CATEGORIES: ReadonlyArray<ReadinessCategory> = [
@@ -23,8 +22,19 @@ function hasDocumentSource(record: StrategyInventoryRecord) {
   return record.source_status === "found" || record.source_status === "needs_validation";
 }
 
+function hasTranslationBlock(record: StrategyInventoryRecord) {
+  return (
+    record.translation_status === "needs_translation" ||
+    record.translation_status === "partial"
+  );
+}
+
 function isSerbianLanguageException(record: StrategyInventoryRecord) {
-  return record.country_code === "SRB" && record.language === "sr";
+  return (
+    record.country_code === "SRB" &&
+    record.language === "sr" &&
+    !hasTranslationBlock(record)
+  );
 }
 
 function needsTranslation(record: StrategyInventoryRecord) {
@@ -32,10 +42,7 @@ function needsTranslation(record: StrategyInventoryRecord) {
     return false;
   }
 
-  return (
-    record.translation_status === "needs_translation" ||
-    record.translation_status === "partial"
-  );
+  return hasTranslationBlock(record);
 }
 
 function needsValidation(record: StrategyInventoryRecord) {
@@ -50,6 +57,7 @@ function isAiReadyRecord(record: StrategyInventoryRecord) {
   return (
     record.source_status === "found" &&
     record.parsing_status === "parsed" &&
+    !hasTranslationBlock(record) &&
     (record.ai_ready || isSerbianLanguageException(record))
   );
 }
@@ -175,22 +183,5 @@ export function getStrategyInventorySummary(
     unknown_year_count: publicationYearCounts.get("Unknown") ?? 0,
     status_breakdown,
     latest_last_updated: latestLastUpdated(records),
-  };
-}
-
-export function getStrategyInventoryDisplaySummary(
-  records: StrategyInventoryRecord[],
-  expectedLsgs: number | ExpectedLsg[],
-  summaryOverride?: StrategyInventorySummaryOverride,
-): StrategyInventorySummary {
-  const summary = getStrategyInventorySummary(records, expectedLsgs);
-
-  if (!summaryOverride) {
-    return summary;
-  }
-
-  return {
-    ...summary,
-    ...summaryOverride,
   };
 }

@@ -286,7 +286,10 @@ export default async function AnalyticsPage({
 
           <Card className="border-[var(--border-soft)] bg-[var(--surface-strong)] shadow-[0_18px_50px_rgba(2,20,32,0.08)]">
             <CardContent>
-            <form className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto]">
+            <form
+              key={`${data.selected.year}:${data.selected.province}:${data.selected.municipalityId}:${data.selected.metricId}`}
+              className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto]"
+            >
               <input type="hidden" name="tab" value="single" />
               <input type="hidden" name="year" value={String(data.selected.year)} />
               <input type="hidden" name="province" value={data.selected.province} />
@@ -353,7 +356,10 @@ export default async function AnalyticsPage({
               selectedProvince={data.municipality.province}
               adminLabels={country.adminLabels}
               controls={
-                <form className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                <form
+                  key={`${data.selected.year}:${data.selected.province}:${data.selected.municipalityId}:${data.selected.xMetricId}:${data.selected.yMetricId}`}
+                  className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+                >
                   <input type="hidden" name="tab" value="multi" />
                   <input type="hidden" name="year" value={String(data.selected.year)} />
                   <input type="hidden" name="province" value={data.selected.province} />

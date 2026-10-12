@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
+
+import XLSX from "xlsx";
 
 import {
   buildCountryPlanSourcePayloads,
@@ -7,7 +12,44 @@ import {
 } from "../scripts/lib/plan-sources.mjs";
 import { getCountryConfigs } from "../scripts/lib/nepal-data.mjs";
 
-const workbook = readPlanSourceWorkbook("data/SNG Development Plans.xlsx");
+const fixtureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "ldt-plan-source-"));
+const fixturePath = path.join(fixtureDirectory, "SNG Development Plans.xlsx");
+const fixtureWorkbook = XLSX.utils.book_new();
+
+XLSX.utils.book_append_sheet(
+  fixtureWorkbook,
+  XLSX.utils.json_to_sheet([
+    { Province: "Bagmati", Link: "https://example.com/bagmati.pdf", Notes: "5-year strategy" },
+    { Province: "Bagmati", Link: "https://example.com/bagmati.pdf", Notes: "5-year strategy" },
+    { Province: "", Link: "https://example.com/ignored.pdf", Notes: "" },
+  ]),
+  "Nepal",
+);
+XLSX.utils.book_append_sheet(
+  fixtureWorkbook,
+  XLSX.utils.json_to_sheet([
+    { Admin_1: "Central", Admin_2: "Chitambo", URL: "https://example.com/chitambo.pdf" },
+    { Admin_1: "Central", Admin_2: "Chitambo", URL: "https://example.com/chitambo.pdf" },
+    { Admin_1: "Central", Admin_2: "Chasefu", URL: "" },
+    { Admin_1: "", Admin_2: "", URL: "https://example.com/ignored.pdf" },
+  ]),
+  "Zambia",
+);
+XLSX.utils.book_append_sheet(
+  fixtureWorkbook,
+  XLSX.utils.json_to_sheet([
+    { Admin_1: "Borski", Admin_2: "Bor", URL: "https://example.com/bor.pdf" },
+    { Admin_1: "Borski", Admin_2: "Bor", URL: "https://example.com/bor.pdf" },
+    { Admin_1: "Borski", Admin_2: "Majdanpek", URL: "" },
+  ]),
+  "Serbia",
+);
+XLSX.writeFile(fixtureWorkbook, fixturePath);
+const workbook = readPlanSourceWorkbook(fixturePath);
+
+test.after(() => {
+  fs.rmSync(fixtureDirectory, { recursive: true, force: true });
+});
 
 function getConfig(code) {
   return getCountryConfigs(code)[0];
@@ -56,8 +98,8 @@ test("Zambia SNG workbook rows map to district-keyed local plan sources plus one
     (row) => row.plan_level === "national",
   );
 
-  assert.equal(payloads.provincePlanSources.length, 112);
-  assert.equal(localRows.length, 112);
+  assert.equal(payloads.provincePlanSources.length, 1);
+  assert.equal(localRows.length, 1);
   assert.equal(nationalRows.length, 1);
   assert.equal(localRows.some((row) => row.province === "Chasefu"), false);
 
@@ -70,7 +112,7 @@ test("Zambia SNG workbook rows map to district-keyed local plan sources plus one
       plan_level: "province",
       province: "Chitambo",
       title: "Chitambo local development plan",
-      link: "https://www.chitambocouncil.gov.zm/wp-content/uploads/2024/08/CHITAMBO-IDP_SIMPLIFIED-VERSION-2024.pdf",
+      link: "https://example.com/chitambo.pdf",
       document_type: "local_development_plan",
       score_theme: null,
       notes: "Province: Central",
@@ -96,8 +138,8 @@ test("Serbia SNG workbook rows map to municipality-keyed local plan sources plus
     (row) => row.plan_level === "national",
   );
 
-  assert.equal(payloads.provincePlanSources.length, 151);
-  assert.equal(localRows.length, 151);
+  assert.equal(payloads.provincePlanSources.length, 1);
+  assert.equal(localRows.length, 1);
   assert.equal(nationalRows.length, 1);
   assert.equal(localRows.some((row) => row.province === "Majdanpek"), false);
 
@@ -110,7 +152,7 @@ test("Serbia SNG workbook rows map to municipality-keyed local plan sources plus
       plan_level: "province",
       province: "Bor",
       title: "Bor local development plan",
-      link: "https://bor.rs/wp-content/uploads/2025/01/Plan-razvoja_Grad-Bor-nacrt-kraj-2.pdf",
+      link: "https://example.com/bor.pdf",
       document_type: "local_development_plan",
       score_theme: null,
       notes: "District: Borski",
