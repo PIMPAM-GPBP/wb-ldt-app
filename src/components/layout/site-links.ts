@@ -21,4 +21,5 @@ export const countryWorkspaceLinks = [
   { href: "/nepal", label: "Nepal" },
   { href: "/serbia", label: "Serbia" },
   { href: "/zambia", label: "Zambia" },
+  { href: "/vietnam", label: "Vietnam" },
 ] as const;

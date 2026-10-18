@@ -12,6 +12,7 @@ const countryOptions = [
   { value: "/nepal", label: "Nepal" },
   { value: "/serbia", label: "Serbia" },
   { value: "/zambia", label: "Zambia" },
+  { value: "/vietnam", label: "Vietnam" },
 ] as const;
 
 export function CountrySelector() {
