@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
 import Image from "next/image";
 
 import pilDiagram from "../../images/PIL Diagram v2.png";
@@ -13,13 +16,36 @@ const analyticsDatasets = [
   zambiaAnalyticsData,
 ] as const;
 
-const totalLoadedLsgs = analyticsDatasets.reduce(
+const totalLoadedLsgsFromImports = analyticsDatasets.reduce(
   (sum, dataset) => sum + dataset.coverage.analyticsMunicipalityCount,
   0,
 );
-const latestDataYear = Math.max(
+const latestDataYearFromImports = Math.max(
   ...analyticsDatasets.map((dataset) => dataset.release.year),
 );
+
+// Vietnam's generated dataset is far larger than the other countries' fallback files, so it is
+// read lazily at request time instead of being statically imported into the page bundle.
+async function loadVietnamSummary() {
+  try {
+    const filePath = path.join(
+      process.cwd(),
+      "src/generated/vietnam/analytics-data.json",
+    );
+    const raw = await readFile(filePath, "utf8");
+    const dataset = JSON.parse(raw) as {
+      coverage: { analyticsMunicipalityCount: number };
+      release: { year: number };
+    };
+
+    return {
+      analyticsMunicipalityCount: dataset.coverage.analyticsMunicipalityCount,
+      year: dataset.release.year,
+    };
+  } catch {
+    return { analyticsMunicipalityCount: 0, year: 0 };
+  }
+}
 
 const capabilityCards = [
   {
@@ -40,22 +66,30 @@ const capabilityCards = [
   },
 ] as const;
 
-const homeStats = [
-  {
-    value: String(countries.length),
-    label: "Country workspaces",
-  },
-  {
-    value: totalLoadedLsgs.toLocaleString("en-US"),
-    label: "LSGs currently loaded",
-  },
-  {
-    value: String(latestDataYear),
-    label: "Latest data year",
-  },
-] as const;
+export default async function Home() {
+  const vietnamSummary = await loadVietnamSummary();
+  const totalLoadedLsgs =
+    totalLoadedLsgsFromImports + vietnamSummary.analyticsMunicipalityCount;
+  const latestDataYear = Math.max(
+    latestDataYearFromImports,
+    vietnamSummary.year,
+  );
 
-export default function Home() {
+  const homeStats = [
+    {
+      value: String(countries.length),
+      label: "Country workspaces",
+    },
+    {
+      value: totalLoadedLsgs.toLocaleString("en-US"),
+      label: "LSGs currently loaded",
+    },
+    {
+      value: String(latestDataYear),
+      label: "Latest data year",
+    },
+  ] as const;
+
   return (
     <main className="flex flex-1 flex-col">
       <section className="border-b border-[var(--border-soft)] bg-[radial-gradient(circle_at_top,var(--hero-glow),transparent_38%),linear-gradient(180deg,var(--hero-wash-start),var(--hero-wash-end))]">

@@ -4,6 +4,7 @@ export const countries = [
     slug: "nepal",
     name: "Nepal",
     analyticsStatus: "live",
+    dataSource: "supabase",
     fallbackDataPath: "src/generated/analytics-data.json",
     mapDataPath: "public/data/nepal-municipalities.geojson",
     adminLabels: {
@@ -75,6 +76,7 @@ export const countries = [
     slug: "zambia",
     name: "Zambia",
     analyticsStatus: "live",
+    dataSource: "supabase",
     fallbackDataPath: "src/generated/zambia/analytics-data.json",
     mapDataPath: "public/data/zambia/municipalities.geojson",
     adminLabels: {
@@ -151,6 +153,7 @@ export const countries = [
     slug: "serbia",
     name: "Serbia",
     analyticsStatus: "live",
+    dataSource: "supabase",
     fallbackDataPath: "src/generated/serbia/analytics-data.json",
     mapDataPath: "public/data/serbia/municipalities.geojson",
     adminLabels: {
@@ -220,6 +223,83 @@ export const countries = [
       planSourceAdminLevel: "lower",
       message:
         "Local/SNG planning documents are available for AI-assisted analysis where source links are loaded.",
+    },
+  },
+  {
+    code: "VNM",
+    slug: "vietnam",
+    name: "Vietnam",
+    analyticsStatus: "live",
+    dataSource: "local",
+    fallbackDataPath: "src/generated/vietnam/analytics-data.json",
+    mapDataPath: "public/data/vietnam/municipalities.geojson",
+    adminLabels: {
+      lower: { singular: "Commune", plural: "Communes" },
+      middle: null,
+      higher: { singular: "Province", plural: "Provinces" },
+    },
+    adminLevelGuide: {
+      summary:
+        "The LDT uses Vietnam's post-2025 two-tier structure, comparing commune-level units within the province-level geography that replaced the former province-district-commune system.",
+      levels: [
+        {
+          label: "Admin level 1",
+          name: "Province",
+          description:
+            "On July 1, 2025, Vietnam merged its 63 former provinces and centrally-run cities into 34 Admin level 1 units (28 provinces and 6 centrally-run municipalities, including Hanoi, Ho Chi Minh City, Hai Phong, Da Nang, Can Tho, and Hue). The LDT groups commune-level results under these 34 units.",
+        },
+        {
+          label: "Admin level 2",
+          name: "Commune-level unit",
+          description:
+            "The entire district tier was abolished in the 2025 reform, so communes, wards, and special zones (island districts such as Con Dao and Bach Long Vi) now report directly to the province level. The LDT uses this merged commune-level tier as its local analysis unit.",
+        },
+      ],
+      note:
+        "Because the reform also consolidated roughly 10,000 former commune-level units into about 3,300, the loaded release reflects the new post-reform boundaries rather than the pre-2025 three-tier system.",
+      sourceLinks: [
+        {
+          label: "2025 Vietnamese administrative reforms",
+          href: "https://en.wikipedia.org/wiki/2025_Vietnamese_administrative_reforms",
+        },
+        {
+          label: "Provinces of Vietnam",
+          href: "https://en.wikipedia.org/wiki/Provinces_of_Vietnam",
+        },
+      ],
+    },
+    profile: {
+      populationMillions: 101.6,
+      areaKm2: 331212,
+      context: {
+        summary:
+          "Vietnam's LDT workspace links commune-level development conditions to the country's 2025 administrative consolidation, giving planners a first look at local variation under the new 34-province, two-tier structure.",
+        highlights: [
+          "The 2025 reform cut Vietnam's administrative units from 63 provinces and roughly 10,000 communes to 34 provinces and about 3,300 communes, eliminating the district tier entirely.",
+          "The World Bank's October 2026 East Asia and Pacific update raised Vietnam's 2026 growth forecast to 7.4%, citing strong manufacturing, exports, and public investment as the main drivers.",
+          "Commune and province labels follow the merged post-reform geography so local evidence can be read against the new administrative map rather than the retired district-level system.",
+        ],
+        sourceLinks: [
+          {
+            label: "World Bank Vietnam overview",
+            href: "https://www.worldbank.org/en/country/vietnam/overview",
+          },
+          {
+            label: "Taking Stock: Vietnam Economic Update, March 2025",
+            href: "https://www.worldbank.org/en/country/vietnam/publication/taking-stock-viet-nam-economic-update-march-2025",
+          },
+        ],
+      },
+      strategy: {
+        title: "Five-Year Socio-Economic Development Plan, 2021-2025",
+        url: "https://vietnam.gov.vn/socio-economic-development-plans/socio-economic-development-plan-for-2021-2025-12056314",
+      },
+    },
+    planningDocuments: {
+      aiEnabled: false,
+      planSourceAdminLevel: "higher",
+      message:
+        "Planning documents are not loaded for Vietnam yet, so AI-assisted analysis is not available.",
     },
   },
 ] as const;

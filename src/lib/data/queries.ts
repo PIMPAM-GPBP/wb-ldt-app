@@ -16,6 +16,7 @@ import {
   type CountryCode,
 } from "@/lib/countries";
 import { scoreComponentIndicatorMappings } from "@/lib/data/labels";
+import { loadLocalAnalyticsDataset } from "@/lib/data/local-analytics-dataset";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   AnalyticsDataset,
@@ -219,9 +220,7 @@ async function loadLocalPlanCandidatesForSelection(
 
 const loadLocalAnalyticsFallback = cache(async (countryCode: CountryCode): Promise<AnalyticsDataset> => {
   const country = resolveCountry(countryCode);
-  const filePath = path.join(process.cwd(), country.fallbackDataPath);
-  const raw = await readFile(filePath, "utf8");
-  return JSON.parse(raw) as AnalyticsDataset;
+  return loadLocalAnalyticsDataset(country.fallbackDataPath);
 });
 
 const loadMapFeatureCollection = cache(async (countryCode: CountryCode): Promise<MapFeatureCollection> => {
@@ -686,11 +685,416 @@ function pickReleaseForYear(releases: ReleaseRow[], requestedYear: number) {
   return rowsForYear.find((release) => release.is_active) ?? rowsForYear[0];
 }
 
+function buildLocalAiIndicatorSeries({
+  scoreDefinition,
+  municipality,
+  years,
+  allMunicipalities,
+}: {
+  scoreDefinition: ScoreDefinition;
+  municipality: MunicipalityRecord;
+  years: number[];
+  allMunicipalities: MunicipalityRecord[];
+}): AiIndicatorSeries[] {
+  return scoreDefinition.componentIds.map((componentId, index) => {
+    const indicatorId =
+      scoreComponentIndicatorMappings[
+        componentId as keyof typeof scoreComponentIndicatorMappings
+      ] ?? componentId;
+
+    const points = years.map((year) => {
+      const rowsForYear = allMunicipalities.filter((candidate) => candidate.year === year);
+      const municipalityRow = rowsForYear.find(
+        (candidate) => candidate.compositeKey === municipality.compositeKey,
+      );
+      const sameProvinceRows = rowsForYear.filter(
+        (candidate) => candidate.province === municipality.province,
+      );
+
+      return {
+        year,
+        municipalityValue: municipalityRow?.scoreComponents[componentId] ?? null,
+        provinceAverage: average(
+          sameProvinceRows.map((candidate) => candidate.scoreComponents[componentId] ?? null),
+        ),
+        nationalAverage: average(
+          rowsForYear.map((candidate) => candidate.scoreComponents[componentId] ?? null),
+        ),
+      };
+    });
+
+    return {
+      componentId,
+      indicatorId,
+      label: scoreDefinition.componentLabels[index] ?? componentId,
+      description: null,
+      points,
+      singleYearOnly: years.length <= 1,
+    } satisfies AiIndicatorSeries;
+  });
+}
+
+// Vietnam (and any future country with dataSource: "local") has no seeded Supabase rows yet.
+// Its generated analytics-data.json is already fully joined (indicators/scores/context per
+// municipality per year), so the whole page can be built from that file plus its boundary
+// geojson, without touching Supabase at all.
+async function getAnalyticsPageDataFromLocalDataset(
+  country: Country,
+  rawSearchParams: Promise<SearchParams> | SearchParams,
+): Promise<AnalyticsPageData> {
+  const searchParams = await rawSearchParams;
+  const selectedTab = getSearchValue(searchParams.tab, "multi");
+  const shouldBuildMapData = selectedTab === "single";
+  const shouldBuildComponentData = selectedTab === "single" || selectedTab === "ai";
+  const shouldBuildAiSeries = selectedTab === "ai";
+
+  const [dataset, featureCollection] = await Promise.all([
+    loadLocalAnalyticsFallback(country.code),
+    shouldBuildMapData
+      ? loadMapFeatureCollection(country.code)
+      : Promise.resolve({ type: "FeatureCollection", features: [] } satisfies MapFeatureCollection),
+  ]);
+
+  const years = [...dataset.years].sort((a, b) => a - b);
+  const requestedYear = Number(getSearchValue(searchParams.year, String(dataset.release.year)));
+  const selectedYear = years.includes(requestedYear) ? requestedYear : dataset.release.year;
+
+  const scoreDefinitions = dataset.scoreDefinitions;
+  const indicatorDefinitions = dataset.indicatorDefinitions;
+  const metrics = dataset.metrics;
+  const scoreMetrics = metrics.filter((metric) => metric.kind === "score");
+
+  const selectedMapMetric = findMetricById(
+    metrics,
+    getSearchValue(searchParams.metric, dataset.metricIds.defaultMapMetricId),
+    dataset.metricIds.defaultMapMetricId,
+  );
+  const selectedXMetric = findMetricById(
+    scoreMetrics,
+    getSearchValue(searchParams.x, dataset.metricIds.defaultScatterXMetricId),
+    dataset.metricIds.defaultScatterXMetricId,
+  );
+  const selectedYMetric = findMetricById(
+    scoreMetrics,
+    getSearchValue(searchParams.y, dataset.metricIds.defaultScatterYMetricId),
+    dataset.metricIds.defaultScatterYMetricId,
+  );
+  const selectedAiScore = findMetricById(
+    scoreMetrics,
+    getSearchValue(searchParams.ai_score, dataset.metricIds.defaultMapMetricId),
+    dataset.metricIds.defaultMapMetricId,
+  );
+
+  const municipalitiesForYear = dataset.municipalities.filter(
+    (municipality) => municipality.year === selectedYear,
+  );
+
+  const availableProvinces = ["all", ...dataset.provinces];
+  const requestedProvince = getSearchValue(searchParams.province, "all");
+  const selectedProvince = availableProvinces.includes(requestedProvince)
+    ? requestedProvince
+    : "all";
+
+  const provinceFilteredMunicipalities =
+    selectedProvince === "all"
+      ? municipalitiesForYear
+      : municipalitiesForYear.filter(
+          (municipality) => municipality.province === selectedProvince,
+        );
+
+  const selectedMunicipality =
+    findMunicipalityById(
+      provinceFilteredMunicipalities,
+      getSearchValue(
+        searchParams.municipality,
+        provinceFilteredMunicipalities[0]?.id ?? municipalitiesForYear[0]?.id ?? "",
+      ),
+    ) ?? municipalitiesForYear[0];
+
+  if (!selectedMunicipality) {
+    throw new Error(`No municipalities available for ${country.name} in ${selectedYear}.`);
+  }
+
+  const municipalitiesByCompositeKey = new Map(
+    municipalitiesForYear.map((municipality) => [municipality.compositeKey, municipality]),
+  );
+
+  const mapFeatures = shouldBuildMapData
+    ? buildMapFeatures(
+        featureCollection,
+        municipalitiesByCompositeKey,
+        selectedMapMetric,
+      ).filter((feature) =>
+        selectedProvince === "all"
+          ? true
+          : feature.properties.Province === selectedProvince,
+      )
+    : [];
+
+  const metricSummary = buildMetricSummary(provinceFilteredMunicipalities, selectedMapMetric);
+  const nationalComponentAverages = shouldBuildComponentData
+    ? buildNationalComponentAverages(municipalitiesForYear)
+    : {};
+  const selectedScoreDefinition = inferScoreDefinition(scoreDefinitions, selectedMapMetric);
+  const scoreComponentDefinitions = shouldBuildComponentData
+    ? selectedScoreDefinition.componentIds.map((componentId, index) => {
+        const indicatorId =
+          scoreComponentIndicatorMappings[
+            componentId as keyof typeof scoreComponentIndicatorMappings
+          ];
+        const indicatorDefinition = indicatorDefinitions.find(
+          (definition) => definition.id === indicatorId,
+        );
+
+        return {
+          id: componentId,
+          label: selectedScoreDefinition.componentLabels[index] ?? componentId,
+          description: indicatorDefinition?.description ?? null,
+        };
+      })
+    : [];
+
+  const scoreDriverRows = shouldBuildComponentData
+    ? selectedScoreDefinition.componentIds.map((componentId, index) => {
+        const municipalityValue = selectedMunicipality.scoreComponents[componentId] ?? null;
+        const nationalValue = nationalComponentAverages[componentId] ?? null;
+
+        return {
+          componentId,
+          label: selectedScoreDefinition.componentLabels[index] ?? componentId,
+          municipalityValue,
+          nationalValue,
+          delta:
+            municipalityValue !== null && nationalValue !== null
+              ? Number((municipalityValue - nationalValue).toFixed(2))
+              : null,
+        };
+      })
+    : [];
+
+  const nationalScoreAverages: Record<string, number | null> = {};
+  for (const definition of scoreDefinitions) {
+    nationalScoreAverages[definition.id] = average(
+      municipalitiesForYear.map((municipality) => municipality.scores[definition.id]),
+    );
+  }
+
+  const waterfalls = shouldBuildComponentData ? scoreDefinitions.map((definition) => {
+    const validComponentCount = Math.max(
+      definition.componentIds.filter((componentId) => {
+        const municipalityValue = selectedMunicipality.scoreComponents[componentId] ?? null;
+        const nationalValue = nationalComponentAverages[componentId] ?? null;
+        return Number.isFinite(municipalityValue) && Number.isFinite(nationalValue);
+      }).length,
+      1,
+    );
+
+    const rows = definition.componentIds.map((componentId, index) => {
+      const indicatorId =
+        scoreComponentIndicatorMappings[
+          componentId as keyof typeof scoreComponentIndicatorMappings
+        ];
+      const indicatorDefinition = indicatorDefinitions.find(
+        (candidate) => candidate.id === indicatorId,
+      );
+      const municipalityValue = selectedMunicipality.scoreComponents[componentId] ?? null;
+      const nationalValue = nationalComponentAverages[componentId] ?? null;
+      const delta =
+        Number.isFinite(municipalityValue) && Number.isFinite(nationalValue)
+          ? (municipalityValue as number) - (nationalValue as number)
+          : null;
+
+      return {
+        componentId,
+        label: definition.componentLabels[index] ?? componentId,
+        description: indicatorDefinition?.description ?? null,
+        municipalityValue,
+        nationalValue,
+        contribution:
+          delta === null ? null : Number((delta / validComponentCount).toFixed(2)),
+      };
+    });
+
+    const totalDifference = rows.reduce(
+      (sum, row) => sum + (row.contribution ?? 0),
+      0,
+    );
+
+    return {
+      scoreId: definition.id,
+      scoreLabel: definition.label,
+      municipalityScore: selectedMunicipality.scores[definition.id] ?? null,
+      nationalScore: nationalScoreAverages[definition.id] ?? null,
+      totalDifference:
+        Number.isFinite(selectedMunicipality.scores[definition.id]) &&
+        Number.isFinite(nationalScoreAverages[definition.id])
+          ? Number(
+              (
+                (selectedMunicipality.scores[definition.id] as number) -
+                (nationalScoreAverages[definition.id] as number)
+              ).toFixed(2),
+            )
+          : Number(totalDifference.toFixed(2)),
+      rows,
+    } satisfies ScoreWaterfallGroup;
+  }) : [];
+
+  const aiScoreDefinition =
+    scoreDefinitions.find((definition) => definition.id === selectedAiScore.id) ??
+    scoreDefinitions[0];
+  const aiIndicatorSeries = shouldBuildAiSeries
+    ? buildLocalAiIndicatorSeries({
+        scoreDefinition: aiScoreDefinition,
+        municipality: selectedMunicipality,
+        years,
+        allMunicipalities: dataset.municipalities,
+      })
+    : [];
+  const aiIndicatorSeriesWithDescriptions = aiIndicatorSeries.map((series) => ({
+    ...series,
+    description:
+      indicatorDefinitions.find((definition) => definition.id === series.indicatorId)
+        ?.description ?? null,
+  }));
+  const localPlanUnitName = getLocalPlanUnitName(country, selectedMunicipality);
+  const localPlanUnitLabel = getLocalPlanUnitLabel(country);
+  const localPlanCandidates =
+    shouldBuildAiSeries && country.planningDocuments.aiEnabled
+      ? await loadLocalPlanCandidatesForSelection(country, selectedMunicipality)
+      : [];
+  const localPlanUnavailableMessage =
+    shouldBuildAiSeries &&
+    country.planningDocuments.aiEnabled &&
+    localPlanCandidates.length === 0
+      ? `No local/SNG plan URL is available for ${localPlanUnitName}. Score narrative and national-plan context can still run, but alignment, SWOT, and recommendations need a local plan.`
+      : null;
+  const nationalIndicatorAverages: Record<string, number | null> = {};
+  if (selectedMapMetric.kind === "indicator") {
+    nationalIndicatorAverages[selectedMapMetric.id] =
+      dataset.nationalAverages.indicators[selectedMapMetric.id] ??
+      average(
+        municipalitiesForYear.map((municipality) => municipality.indicators[selectedMapMetric.id]),
+      );
+  }
+
+  return {
+    country: {
+      code: country.code,
+      slug: country.slug,
+      name: country.name,
+    },
+    release: {
+      countryCode: country.code,
+      key: dataset.release.key,
+      year: selectedYear,
+      adminFileName: dataset.release.adminFileName,
+      scoreFileName: dataset.release.scoreFileName,
+      geojsonFileName: dataset.release.geojsonFileName,
+      indicatorWorkbookFileName: dataset.release.indicatorWorkbookFileName,
+    },
+    nationalAverages: {
+      indicators: nationalIndicatorAverages,
+      scores: nationalScoreAverages,
+    },
+    filters: {
+      years,
+      provinces: availableProvinces,
+      metrics,
+      scoreMetrics,
+      municipalities: provinceFilteredMunicipalities
+        .map((municipality) => ({
+          id: municipality.id,
+          label: `${municipality.municipality}, ${municipality.district}`,
+        }))
+        .sort((left, right) => left.label.localeCompare(right.label)),
+    },
+    coverage: {
+      analyticsMunicipalityCount: municipalitiesForYear.length,
+      mapMunicipalityCount: dataset.coverage.mapMunicipalityCount,
+      analyticsOnlyCount: municipalitiesForYear.length - dataset.coverage.mapMunicipalityCount,
+      boundaryOnlyCount: dataset.coverage.boundaryOnlyCount,
+    },
+    selected: {
+      year: selectedYear,
+      province: selectedProvince,
+      municipalityId: selectedMunicipality.id,
+      municipalityName: selectedMunicipality.municipality,
+      metricId: selectedMapMetric.id,
+      xMetricId: selectedXMetric.id,
+      yMetricId: selectedYMetric.id,
+      aiScoreId: aiScoreDefinition.id,
+    },
+    municipality: selectedMunicipality,
+    map: {
+      metric: selectedMapMetric,
+      features: mapFeatures,
+      summary: metricSummary,
+      coverageLabel: `${dataset.coverage.mapMunicipalityCount} mapped of ${municipalitiesForYear.length} analytics municipalities`,
+    },
+    scatter2d: {
+      xMetric: selectedXMetric,
+      yMetric: selectedYMetric,
+      points: provinceFilteredMunicipalities.map((municipality) => ({
+        id: municipality.id,
+        label: municipality.municipality,
+        district: municipality.district,
+        province: municipality.province,
+        x: municipality.scores[selectedXMetric.id] ?? null,
+        y: municipality.scores[selectedYMetric.id] ?? null,
+        selected: municipality.id === selectedMunicipality.id,
+      })),
+    },
+    scatter3d: {
+      points: provinceFilteredMunicipalities.map((municipality) => ({
+        id: municipality.id,
+        label: municipality.municipality,
+        district: municipality.district,
+        province: municipality.province,
+        x: municipality.scores.prosperity_score ?? null,
+        y: municipality.scores.infrastructure_score ?? null,
+        z: municipality.scores.livability_score ?? null,
+        selected: municipality.id === selectedMunicipality.id,
+      })),
+    },
+    metadata: {
+      selectedMetric:
+        indicatorDefinitions.find((definition) => definition.id === selectedMapMetric.id) ??
+        null,
+      scoreDefinition:
+        scoreDefinitions.find((definition) => definition.id === selectedMapMetric.id) ??
+        inferScoreDefinition(scoreDefinitions, selectedMapMetric),
+      scoreComponents: scoreComponentDefinitions,
+      scoreDriverRows,
+    },
+    waterfalls,
+    provinceSummary: buildProvinceSummary(municipalitiesForYear, scoreDefinitions),
+    ai: {
+      scoreOptions: scoreDefinitions.map((definition) => ({
+        id: definition.id,
+        label: definition.label,
+      })),
+      selectedScoreId: aiScoreDefinition.id,
+      indicatorSeries: aiIndicatorSeriesWithDescriptions,
+      cachedStages: {},
+      provincePlanCandidates: localPlanCandidates,
+      localPlanUnitName,
+      localPlanUnitLabel,
+      localPlanAvailable: localPlanCandidates.length > 0,
+      localPlanUnavailableMessage,
+    },
+  } satisfies AnalyticsPageData;
+}
+
 export async function getAnalyticsPageData(
   rawSearchParams: Promise<SearchParams> | SearchParams,
   countryCode: CountryCode = defaultCountry.code,
 ): Promise<AnalyticsPageData> {
   const country = resolveCountry(countryCode);
+
+  if (country.dataSource === "local") {
+    return getAnalyticsPageDataFromLocalDataset(country, rawSearchParams);
+  }
+
   const searchParams = await rawSearchParams;
   const selectedTab = getSearchValue(searchParams.tab, "multi");
   const shouldBuildMapData = selectedTab === "single";

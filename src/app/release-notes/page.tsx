@@ -37,6 +37,24 @@ const versionTypes: Array<{
 
 const releases: Release[] = [
   {
+    version: "Release v1.5.0",
+    date: "October 18, 2026",
+    type: "Major",
+    summary:
+      "This release adds Vietnam as the fourth LDT country workspace, reflecting the country's July 2025 administrative reform to 34 provinces and roughly 3,300 commune-level units with the district tier removed.",
+    sections: [
+      {
+        title: "Vietnam country workspace",
+        items: [
+          "Added a live Vietnam country landing page with population, land area, and national Socio-Economic Development Plan context sourced from the World Bank and the Vietnamese government.",
+          "Added an administrative-level guide explaining Vietnam's post-reform two-tier structure (Province, Commune-level unit) in place of the retired province-district-commune system.",
+          "Matched the loaded Vietnam commune-level boundary file against the generated analytics dataset, producing a full 3,319-feature match for the choropleth map.",
+          "Enabled live Compare Scores and Map & Drivers analytics for Vietnam directly from its generated dataset, without requiring Supabase ingestion; the AI Planning Brief tab stays unavailable until local/SNG plan source documents are loaded.",
+        ],
+      },
+    ],
+  },
+  {
     version: "Release v1.4.4",
     date: "June 15, 2026",
     type: "Minor",
