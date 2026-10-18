@@ -1,9 +1,7 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-
 import type { SngDisplayRow } from "@/components/nepal/sng-display-section";
 import type { CountryHomeGroup } from "@/lib/country-home";
 import type { Country } from "@/lib/countries";
+import { loadLocalAnalyticsDataset } from "@/lib/data/local-analytics-dataset";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { AnalyticsDataset, MunicipalityRecord } from "@/types/analytics";
 
@@ -40,9 +38,7 @@ function lowerFirst(value: string) {
 }
 
 export async function loadCountryDataset(country: Country) {
-  const datasetPath = path.join(process.cwd(), country.fallbackDataPath);
-  const raw = await readFile(datasetPath, "utf8");
-  return JSON.parse(raw) as AnalyticsDataset;
+  return loadLocalAnalyticsDataset(country.fallbackDataPath);
 }
 
 export function normalizePlanKey(value: string) {

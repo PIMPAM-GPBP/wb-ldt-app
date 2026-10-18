@@ -16,6 +16,7 @@ import {
   type CountryCode,
 } from "@/lib/countries";
 import { scoreComponentIndicatorMappings } from "@/lib/data/labels";
+import { loadLocalAnalyticsDataset } from "@/lib/data/local-analytics-dataset";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   AnalyticsDataset,
@@ -219,9 +220,7 @@ async function loadLocalPlanCandidatesForSelection(
 
 const loadLocalAnalyticsFallback = cache(async (countryCode: CountryCode): Promise<AnalyticsDataset> => {
   const country = resolveCountry(countryCode);
-  const filePath = path.join(process.cwd(), country.fallbackDataPath);
-  const raw = await readFile(filePath, "utf8");
-  return JSON.parse(raw) as AnalyticsDataset;
+  return loadLocalAnalyticsDataset(country.fallbackDataPath);
 });
 
 const loadMapFeatureCollection = cache(async (countryCode: CountryCode): Promise<MapFeatureCollection> => {
