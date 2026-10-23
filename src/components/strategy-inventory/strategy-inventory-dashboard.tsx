@@ -7,7 +7,7 @@ import { PlotlyChart } from "@/components/analytics/plotly-chart";
 import { useTheme } from "@/components/theme/theme-provider";
 import { filterStrategyInventoryRecords } from "@/lib/strategy-inventory/filters";
 import {
-  getStrategyInventoryDisplaySummary,
+  getStrategyInventorySummary,
   getReadinessCategory,
   READINESS_CATEGORIES,
 } from "@/lib/strategy-inventory/summarize";
@@ -557,7 +557,7 @@ function StrategyInventoryTable({
                       {parsingStatusLabels[record.parsing_status]}
                     </td>
                     <td className="px-4 py-4 text-sm text-[var(--foreground)]">
-                      {record.ai_ready ? "Yes" : "No"}
+                      {readinessCategory === "AI-ready" ? "Yes" : "No"}
                     </td>
                     <td className="px-4 py-4">
                       {record.source_url ? (
@@ -598,9 +598,11 @@ function StrategyInventoryTable({
 function FollowUpPanel({
   records,
   summary,
+  countryName,
 }: {
   records: StrategyInventoryRecord[];
   summary: StrategyInventorySummary;
+  countryName: string;
 }) {
   const followUpRecords = useMemo(
     () =>
@@ -630,7 +632,7 @@ function FollowUpPanel({
 
       {summary.unlisted_missing_lsg_count > 0 ? (
         <div className="mt-5 rounded-[1.2rem] border border-[var(--border-soft)] bg-[var(--surface-strong)] p-4 text-sm leading-7 text-[var(--muted-foreground)]">
-          {formatNumber(summary.unlisted_missing_lsg_count)} expected Serbian LSGs are not
+          {formatNumber(summary.unlisted_missing_lsg_count)} expected {countryName} LSGs are not
           represented in the current inventory yet. Add the validated master list
           to convert this count into named follow-up rows.
         </div>
@@ -672,12 +674,11 @@ export function StrategyInventoryDashboard({
   dataset: StrategyInventoryDataset;
 }) {
   const summary = useMemo(
-    () => getStrategyInventoryDisplaySummary(
+    () => getStrategyInventorySummary(
       dataset.records,
       dataset.expected_lsg_count,
-      dataset.summary_override,
     ),
-    [dataset.expected_lsg_count, dataset.records, dataset.summary_override],
+    [dataset.expected_lsg_count, dataset.records],
   );
   const countReadinessCategory = (category: ReadinessCategory) =>
     summary.status_breakdown.find((entry) => entry.category === category)?.count ?? 0;
@@ -770,7 +771,11 @@ export function StrategyInventoryDashboard({
 
         <StrategyInventoryTable records={dataset.records} />
 
-        <FollowUpPanel records={dataset.records} summary={summary} />
+        <FollowUpPanel
+          countryName={dataset.country_name}
+          records={dataset.records}
+          summary={summary}
+        />
 
         <aside className="rounded-[1.5rem] border border-[var(--border-soft)] bg-[var(--surface)] p-5 text-sm leading-7 text-[var(--muted-foreground)]">
           Coverage is calculated at the LSG level. Document counts may exceed the

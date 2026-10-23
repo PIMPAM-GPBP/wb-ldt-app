@@ -9,6 +9,7 @@ import type {
   AiIndicatorSeries,
   AiPipelineContext,
 } from "@/lib/ai/types";
+import { InvalidAiScopeError } from "@/lib/ai/request";
 import {
   defaultCountry,
   getCountryByCode,
@@ -16,6 +17,10 @@ import {
   type CountryCode,
 } from "@/lib/countries";
 import { scoreComponentIndicatorMappings } from "@/lib/data/labels";
+import {
+  buildReleaseMunicipalityMembership,
+  filterMunicipalitiesByReleaseMembership,
+} from "@/lib/data/release-membership";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   AnalyticsDataset,
@@ -356,6 +361,8 @@ const loadScoreValuesForRelease = cache(async (releaseId: string, year: number) 
       .select("municipality_id, score_id, score_value")
       .eq("release_id", releaseId)
       .eq("year", year)
+      .order("municipality_id", { ascending: true })
+      .order("score_id", { ascending: true })
       .range(from, to),
   );
 });
@@ -371,6 +378,8 @@ const loadIndicatorValuesForRelease = cache(
         .eq("release_id", releaseId)
         .eq("year", year)
         .eq("indicator_id", indicatorId)
+        .order("municipality_id", { ascending: true })
+        .order("indicator_id", { ascending: true })
         .range(from, to),
     );
   },
@@ -405,6 +414,8 @@ const loadScoreComponentValuesForRelease = cache(async (releaseId: string, year:
         .select("municipality_id, component_id, score_value")
         .eq("release_id", releaseId)
         .eq("year", year)
+        .order("municipality_id", { ascending: true })
+        .order("component_id", { ascending: true })
         .range(from, to),
     );
   } catch (error) {
@@ -428,6 +439,7 @@ const loadContextValuesForRelease = cache(async (releaseId: string, year: number
         )
         .eq("release_id", releaseId)
         .eq("year", year)
+        .order("municipality_id", { ascending: true })
         .range(from, to),
     );
   } catch (error) {
@@ -518,8 +530,14 @@ function buildMapFeatures(
   featureCollection: MapFeatureCollection,
   municipalitiesByCompositeKey: Map<string, MunicipalityRecord>,
   metric: MetricDefinition,
+  renderableMapMunicipalityKeys: ReadonlySet<string>,
 ) {
   return featureCollection.features
+    .filter(
+      (feature) =>
+        Boolean(feature.geometry) &&
+        renderableMapMunicipalityKeys.has(feature.properties.compositeKey),
+    )
     .map((feature) => {
       const municipality = municipalitiesByCompositeKey.get(feature.properties.compositeKey);
       if (!municipality) {
@@ -532,6 +550,23 @@ function buildMapFeatures(
       } satisfies AnalyticsFeature;
     })
     .filter((feature): feature is AnalyticsFeature => feature !== null);
+}
+
+function getRenderableMapMunicipalityKeys(
+  featureCollection: MapFeatureCollection,
+  municipalitiesByCompositeKey: Map<string, MunicipalityRecord>,
+) {
+  const keys = new Set<string>();
+
+  for (const feature of featureCollection.features) {
+    if (!feature.geometry || !municipalitiesByCompositeKey.has(feature.properties.compositeKey)) {
+      continue;
+    }
+
+    keys.add(feature.properties.compositeKey);
+  }
+
+  return keys;
 }
 
 function buildScoreIndex(rows: ScoreValueRow[]) {
@@ -699,9 +734,7 @@ export async function getAnalyticsPageData(
   const [baseData, localFallback, featureCollection] = await Promise.all([
     loadSupabaseBaseData(country.code),
     loadLocalAnalyticsFallback(country.code),
-    shouldBuildMapData
-      ? loadMapFeatureCollection(country.code)
-      : Promise.resolve({ type: "FeatureCollection", features: [] } satisfies MapFeatureCollection),
+    loadMapFeatureCollection(country.code),
   ]);
 
   if (baseData.releases.length === 0) {
@@ -727,11 +760,14 @@ export async function getAnalyticsPageData(
     existing.push(row);
     scoreComponentRowsByParentId.set(row.parent_score_id, existing);
   }
-  const fallbackMunicipalitiesByCompositeKey = new Map(
-    localFallback.municipalities.map((municipality) => [municipality.compositeKey, municipality]),
+  const fallbackMunicipalityMembership = buildReleaseMunicipalityMembership(
+    localFallback.municipalities,
+    selectedYear,
+    {
+      selectedReleaseKey: selectedRelease.release_key,
+      bundledReleaseKey: localFallback.release.key,
+    },
   );
-  const fallbackMapFeatureKeys = new Set(localFallback.mapFeatureKeys);
-
   const scoreDefinitions = baseData.scoreDefinitions.map((definition) => {
     const fallback = fallbackScoreDefinitionsById.get(definition.id);
     const componentRows = scoreComponentRowsByParentId.get(definition.id) ?? [];
@@ -783,15 +819,6 @@ export async function getAnalyticsPageData(
     })),
   ] satisfies MetricDefinition[];
 
-  const availableProvinces = [
-    "all",
-    ...[...new Set(baseData.municipalities.map((municipality) => municipality.province))].sort(),
-  ];
-  const requestedProvince = getSearchValue(searchParams.province, "all");
-  const selectedProvince = availableProvinces.includes(requestedProvince)
-    ? requestedProvince
-    : "all";
-
   const scoreMetrics = metrics.filter((metric) => metric.kind === "score");
   const selectedMapMetric = findMetricById(
     metrics,
@@ -830,8 +857,14 @@ export async function getAnalyticsPageData(
   const scoreComponentIndex = buildScoreComponentIndex(scoreComponentValueRows);
   const contextIndex = buildContextIndex(contextValueRows);
 
-  const municipalitiesForYear = baseData.municipalities.map((municipality) => {
-    const fallback = fallbackMunicipalitiesByCompositeKey.get(municipality.composite_key);
+  const releaseMunicipalities = filterMunicipalitiesByReleaseMembership(
+    baseData.municipalities,
+    fallbackMunicipalityMembership,
+  );
+  const municipalitiesForYear = releaseMunicipalities.map((municipality) => {
+    const fallback = fallbackMunicipalityMembership.byCompositeKey.get(
+      municipality.composite_key,
+    );
     const scores = scoreIndex.get(municipality.id) ?? {};
     const indicators = indicatorIndex.get(municipality.id) ?? {};
 
@@ -847,7 +880,7 @@ export async function getAnalyticsPageData(
         province: municipality.province_slug,
       },
       year: selectedYear,
-      mapAvailable: fallbackMapFeatureKeys.has(municipality.composite_key),
+      mapAvailable: false as boolean,
       indicators,
       scoreComponents:
         scoreComponentIndex.get(municipality.id) ?? fallback?.scoreComponents ?? {},
@@ -868,6 +901,15 @@ export async function getAnalyticsPageData(
       ),
     } satisfies MunicipalityRecord;
   });
+
+  const availableProvinces = [
+    "all",
+    ...[...new Set(municipalitiesForYear.map((municipality) => municipality.province))].sort(),
+  ];
+  const requestedProvince = getSearchValue(searchParams.province, "all");
+  const selectedProvince = availableProvinces.includes(requestedProvince)
+    ? requestedProvince
+    : "all";
 
   const provinceFilteredMunicipalities =
     selectedProvince === "all"
@@ -890,12 +932,21 @@ export async function getAnalyticsPageData(
   const municipalitiesByCompositeKey = new Map(
     municipalitiesForYear.map((municipality) => [municipality.compositeKey, municipality]),
   );
+  const renderableMapMunicipalityKeys = getRenderableMapMunicipalityKeys(
+    featureCollection,
+    municipalitiesByCompositeKey,
+  );
+  for (const municipality of municipalitiesForYear) {
+    municipality.mapAvailable = renderableMapMunicipalityKeys.has(municipality.compositeKey);
+  }
+  const mapMunicipalityCount = renderableMapMunicipalityKeys.size;
 
   const mapFeatures = shouldBuildMapData
     ? buildMapFeatures(
         featureCollection,
         municipalitiesByCompositeKey,
         selectedMapMetric,
+        renderableMapMunicipalityKeys,
       ).filter((feature) =>
         selectedProvince === "all"
           ? true
@@ -1086,8 +1137,8 @@ export async function getAnalyticsPageData(
     },
     coverage: {
       analyticsMunicipalityCount: municipalitiesForYear.length,
-      mapMunicipalityCount: baseData.mapMunicipalityCount,
-      analyticsOnlyCount: municipalitiesForYear.length - baseData.mapMunicipalityCount,
+      mapMunicipalityCount,
+      analyticsOnlyCount: Math.max(0, municipalitiesForYear.length - mapMunicipalityCount),
       boundaryOnlyCount: localFallback.coverage.boundaryOnlyCount,
     },
     selected: {
@@ -1105,7 +1156,7 @@ export async function getAnalyticsPageData(
       metric: selectedMapMetric,
       features: mapFeatures,
       summary: metricSummary,
-      coverageLabel: `${baseData.mapMunicipalityCount} mapped of ${municipalitiesForYear.length} analytics municipalities`,
+      coverageLabel: `${mapMunicipalityCount} mapped of ${municipalitiesForYear.length} analytics municipalities`,
     },
     scatter2d: {
       xMetric: selectedXMetric,
@@ -1233,12 +1284,14 @@ export async function getMethodologyData() {
 
 export async function getAiPipelineContextForRequest({
   countryCode,
+  releaseKey,
   year,
   municipalityId,
   scoreId,
   includeProvincePlanCandidates = false,
 }: {
   countryCode: CountryCode;
+  releaseKey: string;
   year: number;
   municipalityId: string;
   scoreId: string;
@@ -1251,18 +1304,26 @@ export async function getAiPipelineContextForRequest({
     tab: "ai",
   }, countryCode);
 
+  if (
+    pageData.release.key !== releaseKey ||
+    pageData.release.year !== year ||
+    pageData.municipality.id !== municipalityId ||
+    pageData.ai.selectedScoreId !== scoreId
+  ) {
+    throw new InvalidAiScopeError();
+  }
+
   const provincePlanCandidates = includeProvincePlanCandidates
-    ? await import("@/lib/ai/documents").then((module) =>
-        module.getProvincePlanCandidatesForProvince(
-          pageData.country.code,
-          pageData.ai.localPlanUnitName,
-        ),
-      )
+    ? pageData.ai.provincePlanCandidates
     : [];
 
-  const selectedScore =
-    pageData.ai.scoreOptions.find((option) => option.id === pageData.ai.selectedScoreId) ??
-    pageData.ai.scoreOptions[0];
+  const selectedScore = pageData.ai.scoreOptions.find(
+    (option) => option.id === pageData.ai.selectedScoreId,
+  );
+
+  if (!selectedScore) {
+    throw new InvalidAiScopeError();
+  }
 
   return {
     country: pageData.country,
