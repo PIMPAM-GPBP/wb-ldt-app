@@ -191,6 +191,7 @@ export function ChoroplethMapCard({
       center: [defaultMapView.longitude, defaultMapView.latitude],
       zoom: defaultMapView.zoom,
       attributionControl: false,
+      cooperativeGestures: true,
     });
 
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "top-right");

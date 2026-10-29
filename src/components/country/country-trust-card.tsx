@@ -34,7 +34,7 @@ export function CountryTrustCard({ model }: { model: CountryTrustModel }) {
       className="mx-auto mt-8 w-full max-w-7xl px-6 sm:px-8 lg:px-12"
       aria-labelledby={`${model.countryName.toLowerCase()}-trust-heading`}
     >
-      <article className="rounded-[1.4rem] border border-[var(--border-strong)] bg-white/85 p-6 shadow-[0_16px_38px_rgba(2,20,32,0.07)]">
+      <article className="rounded-[1.4rem] border border-[var(--border-strong)] bg-[var(--surface)] p-6 shadow-[0_16px_38px_rgba(2,20,32,0.07)]">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">

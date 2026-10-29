@@ -180,7 +180,7 @@ export async function CountryLandingPage({ country }: { country: Country }) {
       </section>
 
       <section className="mx-auto -mt-8 w-full max-w-7xl px-6 sm:px-8 lg:px-12">
-        <article className="rounded-[1.35rem] border border-[var(--border-soft)] bg-white/90 p-5 shadow-[0_14px_34px_rgba(2,20,32,0.08)]">
+        <article className="rounded-[1.35rem] border border-[var(--border-soft)] bg-[var(--surface-strong)] p-5 shadow-[0_14px_34px_rgba(2,20,32,0.08)]">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
