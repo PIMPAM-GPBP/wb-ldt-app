@@ -2,6 +2,10 @@
   "name": "wb-ldt-app-nepal",
   "version": "0.1.0",
   "private": true,
+  "main": "server.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
@@ -11,8 +15,9 @@
     "ingest:province-plans": "node scripts/ingest-province-plan-sources-supabase.mjs",
     "ingest:sng-display": "node scripts/ingest-sng-display-table-supabase.mjs",
     "ingest:strategy-inventory": "node scripts/ingest-strategy-inventory-supabase.mjs",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "node server.js",
+    "lint": "eslint",
+    "postinstall": "next build --webpack"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

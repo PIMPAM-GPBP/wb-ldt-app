@@ -1,0 +1,20 @@
+site_name: Local Development Tracker Docs
+nav:
+- Home: index.md
+- V1 Implementation Blueprint: v1-implementation-blueprint.md
+- Roadmap:
+  - AI Governance and Evidence Policy: roadmap/LDT-AI-Governance-and-Evidence-Policy.md
+  - Architecture and Data Model: roadmap/LDT-Architecture-and-Data-Model.md
+  - Codex Implementation Pack README: roadmap/LDT-Codex-Implementation-Pack-README.md
+  - Codex Implementation Prompts: roadmap/LDT-Codex-Implementation-Prompts.md
+  - Feature Backlog and Acceptance Criteria: roadmap/LDT-Feature-Backlog-and-Acceptance-Criteria.md
+  - Integrations, Datasets and Standards: roadmap/LDT-Integrations-Datasets-and-Standards.md
+  - Roadmap Page WWA Backlog: roadmap/LDT-Roadmap-Page-WWA-Backlog.md
+  - Version Roadmap: roadmap/LDT-Version-Roadmap.md
+  - PRD - Expansion (original): roadmap/PRD-Local-Development-Tracker-Expansion-original.md
+  - PRD - Expansion: roadmap/PRD-Local-Development-Tracker-Expansion.md
+- Sprints:
+  - Sprint 1 — Multi-country foundation: sprints/2026-05-28-sprint-1-multi-country-foundation.md
+  - Sprint 2 — Data onboarding: sprints/2026-05-28-sprint-2-data-onboarding.md
+  - Sprint 3 — Country experience and AI: sprints/2026-05-28-sprint-3-country-experience-and-ai.md
+  - Sprint 4 — QA and launch readiness: sprints/2026-05-28-sprint-4-qa-and-launch-readiness.md
