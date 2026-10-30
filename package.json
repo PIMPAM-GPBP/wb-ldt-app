@@ -11,6 +11,7 @@
     "build": "next build --webpack",
     "build:data": "node scripts/build-local-analytics-data.mjs",
     "ingest:supabase": "node scripts/ingest-supabase.mjs",
+    "ingest:generated-dataset": "node scripts/ingest-generated-dataset-supabase.mjs",
     "ingest:boundaries": "node scripts/ingest-boundaries-supabase.mjs",
     "ingest:province-plans": "node scripts/ingest-province-plan-sources-supabase.mjs",
     "ingest:sng-display": "node scripts/ingest-sng-display-table-supabase.mjs",

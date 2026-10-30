@@ -7,7 +7,6 @@ const analyticsFallbackFiles = [
   "./public/data/nepal-municipalities.geojson",
   "./public/data/zambia/municipalities.geojson",
   "./public/data/serbia/municipalities.geojson",
-  "./src/generated/vietnam/analytics-data*.json",
   "./public/data/vietnam/municipalities.geojson",
 ];
 
@@ -38,7 +37,6 @@ const nextConfig: NextConfig = {
     "/nepal": analyticsFallbackFiles,
     "/zambia": analyticsFallbackFiles,
     "/serbia": analyticsFallbackFiles,
-    "/vietnam": analyticsFallbackFiles,
     "/[country]/analytics": analyticsFallbackFiles,
     "/api/countries/[country]/plan-availability": analyticsFallbackFiles,
     "/api/countries/[country]/sng-metrics": analyticsFallbackFiles,

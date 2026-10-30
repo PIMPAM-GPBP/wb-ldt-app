@@ -2,8 +2,8 @@ import type { SngDisplayRow } from "@/components/nepal/sng-display-section";
 import type { CountryHomeGroup } from "@/lib/country-home";
 import type { Country } from "@/lib/countries";
 import { loadLocalAnalyticsDataset } from "@/lib/data/local-analytics-dataset";
+import { getLatestCountryDataset, type LatestCountryDataset } from "@/lib/data/queries";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
-import type { AnalyticsDataset, MunicipalityRecord } from "@/types/analytics";
 
 export type LocalPlanSource = {
   planUnitName: string;
@@ -37,15 +37,17 @@ function lowerFirst(value: string) {
   return value.charAt(0).toLowerCase() + value.slice(1);
 }
 
-export async function loadCountryDataset(country: Country) {
-  return loadLocalAnalyticsDataset(country.fallbackDataPath);
+export async function loadCountryDataset(country: Country): Promise<LatestCountryDataset> {
+  return "fallbackDataPath" in country
+    ? loadLocalAnalyticsDataset(country.fallbackDataPath)
+    : getLatestCountryDataset(country.code);
 }
 
 export function normalizePlanKey(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function latestRows(dataset: AnalyticsDataset) {
+function latestRows(dataset: LatestCountryDataset) {
   const latestYear = Math.max(dataset.release.year, ...dataset.years);
   const rows = dataset.municipalities.filter((municipality) => municipality.year === latestYear);
 
@@ -63,7 +65,7 @@ function averageScore(values: Array<number | null | undefined>) {
   return Number((total / numericValues.length).toFixed(2));
 }
 
-function getPlanUnitName(country: Country, row: MunicipalityRecord) {
+function getPlanUnitName(country: Country, row: LatestCountryDataset["municipalities"][number]) {
   return country.planningDocuments.planSourceAdminLevel === "lower"
     ? row.municipality
     : row.province;
@@ -118,7 +120,7 @@ export function buildPlanSourceMap(sources: LocalPlanSource[]) {
 
 export function buildSngRows(
   country: Country,
-  dataset: AnalyticsDataset,
+  dataset: LatestCountryDataset,
   planSourcesByUnit: Map<string, LocalPlanSource>,
 ): SngDisplayRow[] {
   return latestRows(dataset)
