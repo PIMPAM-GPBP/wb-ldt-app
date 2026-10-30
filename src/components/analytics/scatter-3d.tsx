@@ -1,9 +1,10 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useMemo } from "react";
 
-import { Plotly3DChart } from "@/components/analytics/plotly-chart";
-import { useTheme } from "@/components/theme/theme-provider";
+import { Plotly3DChart, getPlotlyTheme, plotlyAxis, plotlyLayout } from "@/components/analytics/plotly-chart";
+import { useRenderTheme } from "@/components/analytics/use-render-theme";
+import { useSearchParamUpdater } from "@/components/analytics/use-search-param-updater";
 import type { AdminLabels } from "@/lib/countries";
 
 export type Scatter3DCardProps = {
@@ -25,168 +26,98 @@ function lowerFirst(value: string) {
   return value.charAt(0).toLowerCase() + value.slice(1);
 }
 
-export function Scatter3DCard({
-  selectedProvince,
-  adminLabels,
-  points,
-}: Scatter3DCardProps) {
-  const { isDark } = useTheme();
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  const visiblePoints = points.filter(
-    (point): point is typeof point & { x: number; y: number; z: number } =>
-      point.x !== null && point.y !== null && point.z !== null,
-  );
-
-  const highlighted = visiblePoints.filter((point) => point.selected);
-  const sameProvince = visiblePoints.filter(
-    (point) => !point.selected && point.province === selectedProvince,
-  );
-  const others = visiblePoints.filter(
-    (point) => !point.selected && point.province !== selectedProvince,
-  );
-  const chartSurface = isDark ? "rgba(7,28,42,0.96)" : "rgba(238,242,251,0.86)";
-  const gridColor = isDark ? "rgba(201,211,234,0.12)" : "rgba(55,66,145,0.12)";
-  const axisColor = isDark ? "rgba(201,211,234,0.2)" : "rgba(55,66,145,0.2)";
-  const textColor = isDark ? "#f5f7ff" : "#374291";
-  const mutedSeries = isDark ? "rgba(201,211,234,0.54)" : "rgba(55,66,145,0.58)";
+export function Scatter3DCard({ selectedProvince, adminLabels, points }: Scatter3DCardProps) {
+  const theme = useRenderTheme();
+  const { update } = useSearchParamUpdater();
   const lowerSingular = adminLabels.lower.singular;
   const lowerPlural = adminLabels.lower.plural;
   const higherSingular = adminLabels.higher.singular;
-  const hoverLocationTemplate = adminLabels.middle
-    ? `${adminLabels.middle.singular}: %{customdata[2]}<br>${higherSingular}: %{customdata[3]}<br>`
-    : `${higherSingular}: %{customdata[3]}<br>`;
+
+  const chart = useMemo(() => {
+    const colors = getPlotlyTheme(theme);
+    const visiblePoints = points.filter(
+      (point): point is typeof point & { x: number; y: number; z: number } =>
+        point.x !== null && point.y !== null && point.z !== null,
+    );
+    const selected = visiblePoints.find((point) => point.selected);
+    const sameProvince = visiblePoints.filter((point) => !point.selected && point.province === selectedProvince);
+    const others = visiblePoints.filter((point) => !point.selected && point.province !== selectedProvince);
+
+    const hoverLocation = adminLabels.middle
+      ? `${adminLabels.middle.singular}: %{customdata[2]}<br>${higherSingular}: %{customdata[3]}<br>`
+      : `${higherSingular}: %{customdata[3]}<br>`;
+    const hovertemplate =
+      `<b>%{text}</b><br>${hoverLocation}` +
+      "Prosperity: %{x:.1f}<br>Infrastructure: %{y:.1f}<br>Livability: %{z:.1f}<extra></extra>";
+
+    const trace = (name: string, group: typeof visiblePoints, marker: Record<string, unknown>) => ({
+      type: "scatter3d",
+      mode: "markers",
+      name,
+      x: group.map((point) => point.x),
+      y: group.map((point) => point.y),
+      z: group.map((point) => point.z),
+      text: group.map((point) => point.label),
+      customdata: group.map((point) => [point.id, point.label, point.district, point.province]),
+      marker,
+      hovertemplate,
+    });
+
+    const data = [
+      trace(`Other ${lowerFirst(lowerPlural)}`, others, { color: colors.inkMuted, opacity: 0.4, size: 4 }),
+      trace(`In ${selectedProvince}`, sameProvince, { color: colors.accent, opacity: 0.85, size: 5 }),
+      {
+        ...trace(selected?.label ?? `Selected ${lowerFirst(lowerSingular)}`, selected ? [selected] : [], {
+          color: colors.ink,
+          size: 11,
+          line: { color: colors.page, width: 2 },
+        }),
+        showlegend: selected !== undefined,
+      },
+    ];
+
+    const sceneAxis = (title: string) =>
+      plotlyAxis(theme, { title, range: [0, 100], showbackground: false, gridcolor: colors.axis });
+
+    const layout = plotlyLayout(theme, {
+      autosize: true,
+      height: 640,
+      margin: { l: 0, r: 0, t: 32, b: 0 },
+      legend: {
+        orientation: "h",
+        x: 0,
+        xanchor: "left",
+        y: 1,
+        yanchor: "bottom",
+        font: { size: 12, color: colors.inkMuted },
+      },
+      scene: {
+        xaxis: sceneAxis("Prosperity"),
+        yaxis: sceneAxis("Infrastructure"),
+        zaxis: sceneAxis("Livability"),
+        bgcolor: "rgba(0,0,0,0)",
+        aspectmode: "cube",
+        camera: { eye: { x: 1.3, y: 1.25, z: 0.85 } },
+      },
+    });
+
+    return { data, layout };
+  }, [theme, points, selectedProvince, adminLabels, higherSingular, lowerSingular, lowerPlural]);
 
   return (
-    <section className="rounded-[2rem] border border-[var(--border-soft)] bg-[var(--surface-strong)] p-6 shadow-[0_18px_50px_rgba(2,20,32,0.08)]">
-      <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
-        3D scatterplot
-      </p>
-      <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[var(--foreground)]">
-        Prosperity, Infrastructure, and Livability
-      </h2>
-      <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">
-        Rotate, pan, and zoom the point cloud. The selected {lowerFirst(lowerSingular)} is red and the rest of its {lowerFirst(higherSingular)} is orange.
-      </p>
-      <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-[var(--border-soft)] bg-white/80">
-        <Plotly3DChart
-          data={[
-            {
-              type: "scatter3d",
-              mode: "markers",
-              name: `Other ${lowerFirst(lowerPlural)}`,
-              x: others.map((point) => point.x),
-              y: others.map((point) => point.y),
-              z: others.map((point) => point.z),
-              text: others.map((point) => point.label),
-              customdata: others.map((point) => [point.id, point.label, point.district, point.province]),
-              marker: {
-                color: mutedSeries,
-                size: 5,
-              },
-              hovertemplate:
-                `<b>%{text}</b><br>${hoverLocationTemplate}` +
-                "Prosperity: %{x:.2f}<br>Infrastructure: %{y:.2f}<br>Livability: %{z:.2f}<extra></extra>",
-            },
-            {
-              type: "scatter3d",
-              mode: "markers",
-              name: `Same ${lowerFirst(higherSingular)}`,
-              x: sameProvince.map((point) => point.x),
-              y: sameProvince.map((point) => point.y),
-              z: sameProvince.map((point) => point.z),
-              text: sameProvince.map((point) => point.label),
-              customdata: sameProvince.map((point) => [point.id, point.label, point.district, point.province]),
-              marker: {
-                color: "#f4a261",
-                size: 6,
-                line: { color: "#9a4d00", width: 0.6 },
-              },
-              hovertemplate:
-                `<b>%{text}</b><br>${hoverLocationTemplate}` +
-                "Prosperity: %{x:.2f}<br>Infrastructure: %{y:.2f}<br>Livability: %{z:.2f}<extra></extra>",
-            },
-            {
-              type: "scatter3d",
-              mode: "markers",
-              name: `Highlighted ${lowerFirst(lowerSingular)}`,
-              x: highlighted.map((point) => point.x),
-              y: highlighted.map((point) => point.y),
-              z: highlighted.map((point) => point.z),
-              text: highlighted.map((point) => point.label),
-              customdata: highlighted.map((point) => [point.id, point.label, point.district, point.province]),
-              marker: {
-                color: "#c1121f",
-                size: 8,
-                line: { color: "#5f0f16", width: 1 },
-              },
-              hovertemplate:
-                `<b>%{text}</b><br>${hoverLocationTemplate}` +
-                "Prosperity: %{x:.2f}<br>Infrastructure: %{y:.2f}<br>Livability: %{z:.2f}<extra></extra>",
-            },
-          ]}
-          layout={{
-            autosize: true,
-            height: 720,
-            margin: { l: 0, r: 0, t: 24, b: 0 },
-            paper_bgcolor: "rgba(0,0,0,0)",
-            legend: {
-              orientation: "h",
-              yanchor: "bottom",
-              y: 1.02,
-              xanchor: "left",
-              x: 0,
-              font: { color: textColor },
-            },
-            scene: {
-              xaxis: {
-                title: { text: "Prosperity", font: { color: textColor } },
-                range: [0, 100],
-                backgroundcolor: chartSurface,
-                gridcolor: gridColor,
-                zerolinecolor: axisColor,
-                tickfont: { color: textColor },
-              },
-              yaxis: {
-                title: { text: "Infrastructure", font: { color: textColor } },
-                range: [0, 100],
-                backgroundcolor: chartSurface,
-                gridcolor: gridColor,
-                zerolinecolor: axisColor,
-                tickfont: { color: textColor },
-              },
-              zaxis: {
-                title: { text: "Livability", font: { color: textColor } },
-                range: [0, 100],
-                backgroundcolor: chartSurface,
-                gridcolor: gridColor,
-                zerolinecolor: axisColor,
-                tickfont: { color: textColor },
-              },
-              bgcolor: "rgba(0,0,0,0)",
-              aspectmode: "cube",
-              camera: {
-                eye: { x: 1.5, y: 1.45, z: 0.95 },
-              },
-            },
-          }}
-          config={{ responsive: true, displaylogo: false }}
-          style={{ width: "100%", height: "100%" }}
-          useResizeHandler
-          onClick={(event) => {
-            const point = event.points?.[0];
-            const municipalityId = point?.customdata?.[0];
-            if (typeof municipalityId !== "string" || municipalityId.length === 0) {
-              return;
-            }
-            const nextParams = new URLSearchParams(searchParams.toString());
-            nextParams.set("municipality", municipalityId);
-            router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
-          }}
-        />
-      </div>
-    </section>
+    <Plotly3DChart
+      data={chart.data}
+      layout={chart.layout}
+      config={{ responsive: true, displaylogo: false }}
+      style={{ width: "100%", height: "100%" }}
+      useResizeHandler
+      onClick={(event) => {
+        const municipalityId = event.points?.[0]?.customdata?.[0];
+        if (typeof municipalityId !== "string" || municipalityId.length === 0) {
+          return;
+        }
+        update({ municipality: municipalityId });
+      }}
+    />
   );
 }

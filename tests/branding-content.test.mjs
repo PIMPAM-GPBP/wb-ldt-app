@@ -27,8 +27,9 @@ test("branding assets and PIL diagram are wired into the app", async () => {
   assert.match(layoutBranding, /images\/gpb-logo\.png/);
   assert.match(layoutBranding, /images\/ldt-logo-dark\.png/);
   assert.match(layoutBranding, /images\/pimpam_logo\.png/);
-  assert.match(home, /PIL Diagram v2\.png/);
+  // The framework diagram lives on Methodology; the home page leads with the country maps.
   assert.match(methodology, /PIL Diagram v2\.png/);
+  assert.doesNotMatch(home, /PIL Diagram v2\.png/);
 });
 
 test("global typography follows the requested Fira Sans and Inter stack", async () => {
@@ -58,10 +59,11 @@ test("header navigation links to the About page instead of country anchors", asy
   const headerBlock = siteLinks.match(/export const headerNavItems = \[[\s\S]*?\] as const;/)?.[0] ?? "";
 
   assert.match(headerBlock, /\{ href: "\/about", label: "About", exact: false \}/);
-  assert.match(headerBlock, /\{ href: "\/resources", label: "Resources", exact: false \}/);
+  // Renamed from Resources on 2026-10-30, once the page offered the data itself; the URL kept its old path.
+  assert.match(headerBlock, /\{ href: "\/resources", label: "Data", exact: false \}/);
   assert.match(
     headerBlock,
-    /label: "Methodology"[\s\S]*label: "Resources"[\s\S]*label: "Release Notes"/,
+    /label: "Methodology"[\s\S]*label: "Data"[\s\S]*label: "Data updates"/,
   );
   assert.doesNotMatch(headerBlock, /label: "Countries"/);
   assert.doesNotMatch(headerBlock, /#country-workspaces/);
@@ -72,7 +74,7 @@ test("resources page exposes core LDT Drive materials", async () => {
   const resourcesData = await readFile("src/lib/resources.ts", "utf8");
   const siteLinks = await readFile("src/components/layout/site-links.ts", "utf8");
 
-  assert.match(siteLinks, /href: "\/resources", label: "Resources"/);
+  assert.match(siteLinks, /href: "\/resources", label: "Data"/);
   assert.match(resourcesPage, /Core LDT materials/);
   assert.doesNotMatch(resourcesPage, /Open Drive folder/);
   assert.doesNotMatch(resourcesPage, /ldtResourceFolder\.description/);
@@ -86,7 +88,6 @@ test("resources page exposes country document workspaces", async () => {
   const resourcesPage = await readFile("src/app/resources/page.tsx", "utf8");
   const resourcesData = await readFile("src/lib/resources.ts", "utf8");
 
-  assert.match(resourcesPage, /Country resource spaces/);
   assert.match(resourcesPage, /Documents, demos, and analyses by country/);
   assert.match(resourcesData, /countryResourcePacks/);
   assert.match(resourcesData, /1WIOlbm9Et6-0CdmwCtw8KAIEqLdtcJbV/);
@@ -101,8 +102,9 @@ test("resources page exposes country document workspaces", async () => {
   assert.match(resourcesData, /No top-level files were listed/);
 });
 
-test("about page follows the GPB LDT briefing content", async () => {
-  const about = await readFile("src/app/about/page.tsx", "utf8");
+// The QuickStart note moved from /about to /resources/quickstart on 2026-10-30, kept as published.
+test("the QuickStart note follows the GPB LDT briefing content", async () => {
+  const about = await readFile("src/app/resources/quickstart/page.tsx", "utf8");
 
   assert.match(about, /Local Development Tracker QuickStart/);
   assert.match(about, /lg:whitespace-nowrap/);
@@ -125,4 +127,30 @@ test("about page follows the GPB LDT briefing content", async () => {
   assert.doesNotMatch(about, /about-ldt-world-bank-logo\.png/);
   assert.doesNotMatch(about, /about-ldt-pimpam-logo\.png/);
   assert.doesNotMatch(about, /about-ldt-gpb-tools-logo\.png/);
+});
+
+// Failure mode: Methodology goes back to saying missing components are skipped, which the
+// Phase 1 data check showed is false (the score tables count a fixed value for them).
+test("methodology states the real treatment of unrecorded components and dates the correction", async () => {
+  const methodology = await readFile("src/app/methodology/page.tsx", "utf8");
+
+  assert.doesNotMatch(methodology, /skipped in aggregation where the prepared score tables/);
+  assert.match(methodology, /count a fixed value for it/);
+  assert.match(methodology, /Changes to this page/);
+});
+
+// Failure mode: the data page lists a download that no route or file serves.
+test("every file on the data page is served by a route or a public file", async () => {
+  const { access } = await import("node:fs/promises");
+  const page = await readFile("src/app/resources/page.tsx", "utf8");
+  const downloads = await readFile("src/lib/downloads.ts", "utf8");
+
+  assert.match(page, /getDownloads/);
+  assert.match(downloads, /\/api\/countries\/\$\{country\.slug\}\/scores/);
+  assert.match(downloads, /"\/api\/indicators"/);
+  await access("src/app/api/countries/[country]/scores/route.ts");
+  await access("src/app/api/indicators/route.ts");
+  for (const file of ["public/data/nepal-municipalities.geojson", "public/data/serbia/municipalities.geojson", "public/data/zambia/municipalities.geojson"]) {
+    await access(file);
+  }
 });

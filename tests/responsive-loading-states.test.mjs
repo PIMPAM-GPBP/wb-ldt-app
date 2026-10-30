@@ -17,8 +17,8 @@ test("analytics chart containers use stable mobile dimensions", async () => {
     "src/components/analytics/scatter-3d-loader.tsx",
     "utf8",
   );
-  const waterfall = await readFile(
-    "src/components/analytics/score-waterfall-section.tsx",
+  const drivers = await readFile(
+    "src/components/analytics/atlas/atlas-profile.tsx",
     "utf8",
   );
 
@@ -26,6 +26,6 @@ test("analytics chart containers use stable mobile dimensions", async () => {
   assert.match(scatter, /min-w-\[720px\]/);
   assert.match(scatter3dLoader, /role="status"/);
   assert.match(scatter3dLoader, /min-h-\[420px\]/);
-  assert.match(waterfall, /overflow-x-auto/);
-  assert.match(waterfall, /min-w-\[640px\]/);
+  // The drivers fit a 320px panel: the label column shrinks and wraps, the bar and value columns hold their width.
+  assert.match(drivers, /grid-cols-\[minmax\(0,1fr\)_96px_44px\]/);
 });

@@ -1,4 +1,8 @@
-import Image from "next/image";
+import Link from "next/link";
+
+import { ARTICLE_LINK, ArticleFigure, ArticlePage, ArticleSection, NumberedSteps, PROSE, TermGrid } from "@/components/layout/article";
+import { PILLARS } from "@/lib/analytics/derive";
+import { formatYears, getIndicatorTable, type IndicatorRow } from "@/lib/indicators";
 
 import pilDiagram from "../../../images/PIL Diagram v2.png";
 
@@ -97,7 +101,7 @@ const scoringSteps = [
   "Raw indicator values are transformed into comparable score values on a 0-100 scale, where higher values represent stronger relative performance for that indicator unless explicitly documented otherwise.",
   "Component scores are grouped under Prosperity, Infrastructure, and Livability according to the PIL framework.",
   "Pillar scores use transparent equal-weight aggregation across available component scores unless a country-specific methodology states otherwise.",
-  "Missing component values are not imputed inside the public app; they are skipped in aggregation where the prepared score tables identify them as missing.",
+  "Where a component has nothing recorded for a unit, the prepared score tables count a fixed value for it, so the pillar score still averages all of its components. The planning brief marks those components as not recorded and never compares them.",
   "Published score tables are treated as the authoritative score source for maps, scatterplots, driver charts, and country landing-page summaries.",
 ];
 
@@ -128,27 +132,92 @@ const limitations = [
   },
 ];
 
-export default function MethodologyPage() {
+const TOC = [
+  { id: "overview", label: "Overview" },
+  { id: "framework", label: "PIL framework" },
+  { id: "selection", label: "Indicator selection" },
+  { id: "pillars", label: "The three pillars" },
+  { id: "indicators", label: "Indicators" },
+  { id: "sources", label: "Data acquisition" },
+  { id: "preprocessing", label: "Preprocessing" },
+  { id: "scores", label: "Score calculation" },
+  { id: "years", label: "What changes between years" },
+  { id: "limitations", label: "Limitations" },
+  { id: "references", label: "References" },
+  { id: "changes", label: "Changes to this page" },
+];
+
+function IndicatorTable({ rows }: { rows: IndicatorRow[] }) {
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-6 pb-16 pt-10 sm:px-8 lg:px-12">
-      <section className="rounded-[2rem] border border-[var(--border-soft)] bg-[var(--surface-strong)] p-8 shadow-[0_18px_50px_rgba(2,20,32,0.08)]">
-        <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
-          Methodology
-        </p>
-        <h1 className="mt-4 text-4xl font-semibold tracking-tight text-[var(--foreground)]">
-          Indicator logic, data processing, and score calculation
-        </h1>
-        <p className="mt-5 max-w-4xl text-base leading-8 text-[var(--muted-foreground)]">
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[46rem] border-collapse text-left text-sm">
+        <thead>
+          <tr className="border-b border-[var(--border-strong)] text-ink-muted">
+            <th scope="col" className="w-[26%] py-2 pr-4 font-medium">Indicator</th>
+            <th scope="col" className="py-2 pr-4 font-medium">What it measures</th>
+            <th scope="col" className="w-[9%] py-2 pr-4 font-medium">Better</th>
+            <th scope="col" className="w-[11%] py-2 pr-4 font-medium">Recorded</th>
+            <th scope="col" className="w-[20%] py-2 font-medium">Sources</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id} className="border-b border-[var(--border-soft)] align-top text-ink">
+              <th scope="row" className="py-3 pr-4 font-medium">
+                {row.name}
+                {row.unit ? <span className="block text-xs font-normal text-ink-muted">{row.unit}</span> : null}
+                <span className="block text-xs font-normal text-ink-muted">{row.component ? `Feeds the ${row.component} component` : "Context only, not in a score"}</span>
+              </th>
+              <td className="py-3 pr-4 leading-6">
+                {row.description}
+                {row.descriptionCorrected ? <span className="block text-xs text-ink-muted">Corrected here; the source metadata swaps this description with another hazard&apos;s.</span> : null}
+              </td>
+              <td className="py-3 pr-4">{row.higherIsBetter === null ? "Not stated" : row.higherIsBetter ? "Higher" : "Lower"}</td>
+              <td className="py-3 pr-4 tabular-nums">{formatYears(row.years)}</td>
+              <td className="py-3 leading-6">
+                {row.sources.map((source, index) => (
+                  <span key={source.label}>
+                    {index > 0 ? "; " : null}
+                    {source.url ? (
+                      <a href={source.url} target="_blank" rel="noreferrer" className={ARTICLE_LINK}>
+                        {source.label}
+                      </a>
+                    ) : (
+                      source.label
+                    )}
+                  </span>
+                ))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+const pillarColor = (title: string) => PILLARS.find((pillar) => pillar.label === title)?.cssVar;
+
+export default async function MethodologyPage() {
+  const indicators = await getIndicatorTable();
+  const lateIndicators = indicators.filter((row) => row.years.length === 1);
+  const firstYear = Math.min(...indicators.flatMap((row) => row.years));
+  return (
+    <ArticlePage
+      kicker="Methodology"
+      title="Indicator logic, data processing, and score calculation"
+      lede={
+        <p>
           The Local Development Tracker turns geospatial, environmental, infrastructure,
           and planning data into comparable local-government indicators. This page explains
           how indicators are selected, processed, normalized, and aggregated into the
           Prosperity, Infrastructure, and Livability scores used throughout the app.
         </p>
-      </section>
-
-      <section className="rounded-[1.75rem] border border-[var(--border-soft)] bg-white/80 p-8">
-        <h2 className="text-2xl font-semibold text-[var(--foreground)]">Overview</h2>
-        <div className="mt-5 space-y-4 text-sm leading-8 text-[var(--muted-foreground)]">
+      }
+      toc={TOC}
+    >
+      <ArticleSection id="overview" title="Overview">
+        <div className={PROSE}>
           <p>
             The methodology is designed for country replication. Each country keeps its own
             administrative labels and planning context, while the analytical logic stays
@@ -162,168 +231,147 @@ export default function MethodologyPage() {
             result as screening evidence for further validation.
           </p>
         </div>
-      </section>
+      </ArticleSection>
 
-      <section className="overflow-hidden rounded-[1.75rem] border border-[var(--border-soft)] bg-white/80 p-8">
-        <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-          Analytical architecture
-        </p>
-        <h2 className="mt-3 text-2xl font-semibold text-[var(--foreground)]">
-          PIL framework diagram
-        </h2>
-        <p className="mt-4 max-w-4xl text-sm leading-8 text-[var(--muted-foreground)]">
-          The PIL framework organizes local development evidence around Prosperity,
-          Infrastructure, and Livability. The diagram shows how indicator evidence can
-          be connected to planning interpretation and investment prioritization.
-        </p>
-        <div className="mt-6 rounded-[1.25rem] border border-[var(--border-soft)] bg-white p-4">
-          <Image
-            src={pilDiagram}
-            alt="PIL framework diagram linking local development indicators to planning and investment logic"
-            className="h-auto w-full rounded-[1rem]"
-            priority
-          />
-        </div>
-      </section>
+      <ArticleSection
+        id="framework"
+        title="PIL framework diagram"
+        intro={
+          <p>
+            The PIL framework organizes local development evidence around Prosperity,
+            Infrastructure, and Livability. The diagram shows how indicator evidence can
+            be connected to planning interpretation and investment prioritization.
+          </p>
+        }
+      >
+        <ArticleFigure
+          src={pilDiagram}
+          alt="PIL framework diagram linking local development indicators to planning and investment logic"
+          className="max-w-4xl"
+          priority
+        />
+      </ArticleSection>
 
-      <section className="rounded-[1.75rem] border border-[var(--border-soft)] bg-white/80 p-8">
-        <h2 className="text-2xl font-semibold text-[var(--foreground)]">
-          Indicator Selection Logic
-        </h2>
-        <div className="mt-5 space-y-4 text-sm leading-8 text-[var(--muted-foreground)]">
+      <ArticleSection
+        id="selection"
+        title="Indicator selection logic"
+        intro={
           <p>
             Indicators are selected to balance policy relevance with practical data coverage.
             The aim is not to include every possible local development measure, but to build
             a coherent evidence base that can be maintained and compared across local units.
           </p>
-          <ul className="space-y-2 pl-5">
-            {indicatorSelection.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      </section>
+        }
+      >
+        <ul className="max-w-[68ch] list-disc space-y-2 pl-5 text-[17px] leading-[1.75] text-ink marker:text-ink-muted">
+          {indicatorSelection.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      </ArticleSection>
 
-      <section className="grid gap-6 lg:grid-cols-3">
-        {pillars.map((pillar) => (
-          <article
-            key={pillar.title}
-            className="rounded-[1.5rem] border border-[var(--border-soft)] bg-white/80 p-6"
-          >
-            <h2 className="text-xl font-semibold text-[var(--foreground)]">
-              {pillar.title}
-            </h2>
-            <p className="mt-4 text-sm leading-7 text-[var(--muted-foreground)]">
-              {pillar.body}
-            </p>
-            <ul className="mt-4 space-y-2 pl-5 text-sm leading-7 text-[var(--muted-foreground)]">
-              {pillar.items.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </article>
-        ))}
-      </section>
+      <ArticleSection id="pillars" title="The three pillars">
+        <TermGrid columns={3} items={pillars.map((pillar) => ({ title: pillar.title, body: pillar.body, list: pillar.items, marker: pillarColor(pillar.title) }))} />
+      </ArticleSection>
 
-      <section className="rounded-[1.75rem] border border-[var(--border-soft)] bg-white/80 p-8">
-        <h2 className="text-2xl font-semibold text-[var(--foreground)]">Data Acquisition</h2>
-        <p className="mt-5 max-w-4xl text-sm leading-8 text-[var(--muted-foreground)]">
-          The LDT combines scalable global datasets with country-specific sources where
-          available. Each source is selected for its relevance to local development, spatial
-          coverage, and ability to be processed into local-government units.
-        </p>
-        <div className="mt-6 grid gap-6 lg:grid-cols-3">
-          {dataSources.map((sourceGroup) => (
-            <article
-              key={sourceGroup.title}
-              className="rounded-[1.25rem] border border-[var(--border-soft)] bg-[var(--surface)] p-5"
-            >
-              <h3 className="text-base font-semibold text-[var(--foreground)]">
-                {sourceGroup.title}
+      <ArticleSection
+        id="indicators"
+        title="Indicators"
+        intro={
+          <p>
+            Every score component rests on one indicator. The table gives each one&apos;s measure, the direction that scores higher, the years with recorded
+            values in any country, and its sources. The same indicators apply in every country.{" "}
+            <a href="/api/indicators" download className={ARTICLE_LINK}>
+              Download the indicator list as CSV
+            </a>
+            .
+          </p>
+        }
+      >
+        <div className="space-y-10">
+          {PILLARS.map((pillar) => (
+            <div key={pillar.id}>
+              <h3 className="mb-3 flex items-center gap-2 font-heading text-lg font-semibold text-ink">
+                <span aria-hidden="true" className="size-2.5 rounded-full" style={{ backgroundColor: pillar.cssVar }} />
+                {pillar.label}
               </h3>
-              <ul className="mt-4 space-y-2 pl-5 text-sm leading-7 text-[var(--muted-foreground)]">
-                {sourceGroup.items.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </article>
+              <IndicatorTable rows={indicators.filter((row) => row.pillar === pillar.id)} />
+            </div>
           ))}
         </div>
-      </section>
+      </ArticleSection>
 
-      <section className="rounded-[1.75rem] border border-[var(--border-soft)] bg-white/80 p-8">
-        <h2 className="text-2xl font-semibold text-[var(--foreground)]">
-          Preprocessing and Integration
-        </h2>
-        <p className="mt-5 max-w-4xl text-sm leading-8 text-[var(--muted-foreground)]">
-          Raw data are prepared before they are exposed in the app. The preprocessing
-          pipeline converts heterogeneous input formats into consistent local-unit records
-          that can be compared, mapped, and summarized.
-        </p>
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          {preprocessingSteps.map((step) => (
-            <article
-              key={step.title}
-              className="rounded-[1.25rem] border border-[var(--border-soft)] bg-[var(--surface)] p-5"
-            >
-              <h3 className="text-base font-semibold text-[var(--foreground)]">
-                {step.title}
-              </h3>
-              <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">
-                {step.body}
-              </p>
-            </article>
-          ))}
-        </div>
-      </section>
+      <ArticleSection
+        id="sources"
+        title="Data acquisition"
+        intro={
+          <p>
+            The LDT combines scalable global datasets with country-specific sources where
+            available. Each source is selected for its relevance to local development, spatial
+            coverage, and ability to be processed into local-government units.
+          </p>
+        }
+      >
+        <TermGrid columns={3} items={dataSources.map((group) => ({ title: group.title, list: group.items }))} />
+      </ArticleSection>
 
-      <section className="rounded-[1.75rem] border border-[var(--border-soft)] bg-white/80 p-8">
-        <h2 className="text-2xl font-semibold text-[var(--foreground)]">
-          Score Calculation and Aggregation
-        </h2>
-        <div className="mt-5 space-y-4 text-sm leading-8 text-[var(--muted-foreground)]">
+      <ArticleSection
+        id="preprocessing"
+        title="Preprocessing and integration"
+        intro={
+          <p>
+            Raw data are prepared before they are exposed in the app. The preprocessing
+            pipeline converts heterogeneous input formats into consistent local-unit records
+            that can be compared, mapped, and summarized.
+          </p>
+        }
+      >
+        <NumberedSteps steps={preprocessingSteps} />
+      </ArticleSection>
+
+      <ArticleSection
+        id="scores"
+        title="Score calculation and aggregation"
+        intro={
           <p>
             Score calculation follows a simple interpretation rule: local units are compared
             against other local units in the same release, and higher scores indicate stronger
             relative performance for the selected indicator or pillar unless the metadata says
             otherwise.
           </p>
-          <ul className="space-y-2 pl-5">
-            {scoringSteps.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      </section>
+        }
+      >
+        <NumberedSteps steps={scoringSteps.map((step) => ({ body: step }))} />
+      </ArticleSection>
 
-      <section className="rounded-[1.75rem] border border-[var(--border-soft)] bg-white/80 p-8">
-        <h2 className="text-2xl font-semibold text-[var(--foreground)]">
-          Limitations and Interpretation
-        </h2>
-        <div className="mt-5 grid gap-6 lg:grid-cols-3">
-          {limitations.map((limitation) => (
-            <article
-              key={limitation.title}
-              className="rounded-[1.25rem] border border-[var(--border-soft)] bg-[var(--surface)] p-5"
-            >
-              <h3 className="text-base font-semibold text-[var(--foreground)]">
-                {limitation.title}
-              </h3>
-              <ul className="mt-4 space-y-2 pl-5 text-sm leading-7 text-[var(--muted-foreground)]">
-                {limitation.items.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </article>
-          ))}
-        </div>
-      </section>
+      <ArticleSection
+        id="years"
+        title="What changes between years"
+        intro={
+          <>
+            <p>
+              Most indicators are recorded for every year from {firstYear}. {lateIndicators.length} are recorded only for{" "}
+              {lateIndicators[0]?.years[0]}: {new Intl.ListFormat("en", { type: "conjunction" }).format(lateIndicators.map((row) => row.name))}. For earlier
+              years their components count the fixed value described above.
+            </p>
+            <p>
+              A unit&apos;s score therefore compares across years only where its components were recorded the same way in both. The LDT shows a change only on
+              that basis, and{" "}
+              <Link href="/data-updates#comparability" className={ARTICLE_LINK}>
+                Data updates
+              </Link>{" "}
+              lists how many units compare for each country and score. Compare raw indicator values, not scores, for trends that cross a change in coverage.
+            </p>
+          </>
+        }
+      />
 
-      <section className="rounded-[1.75rem] border border-[var(--border-soft)] bg-white/80 p-8">
-        <h2 className="text-2xl font-semibold text-[var(--foreground)]">
-          References and Further Information
-        </h2>
-        <div className="mt-5 space-y-4 text-sm leading-8 text-[var(--muted-foreground)]">
+      <ArticleSection id="limitations" title="Limitations and interpretation">
+        <TermGrid columns={3} items={limitations.map((limitation) => ({ title: limitation.title, list: limitation.items }))} />
+      </ArticleSection>
+
+      <ArticleSection id="references" title="References and further information">
+        <div className={PROSE}>
           <p>
             Indicator descriptions, source references, and interpretation notes are surfaced
             through the indicator metadata views in the analytics workspace. Users should read
@@ -331,7 +379,19 @@ export default function MethodologyPage() {
             prioritization rather than as final project-selection decisions.
           </p>
         </div>
-      </section>
-    </main>
+      </ArticleSection>
+      <ArticleSection id="changes" title="Changes to this page">
+        <dl className="max-w-[68ch] space-y-4 text-base leading-7 text-ink">
+          <div>
+            <dt className="text-sm font-medium tabular-nums text-ink-muted">30 October 2026</dt>
+            <dd>
+              This page said missing component values were skipped in aggregation. The score tables count a fixed value for them instead, and the score
+              calculation now says so. The indicator table, the section on what changes between years, and corrected descriptions for three hazard
+              indicators were added.
+            </dd>
+          </div>
+        </dl>
+      </ArticleSection>
+    </ArticlePage>
   );
 }

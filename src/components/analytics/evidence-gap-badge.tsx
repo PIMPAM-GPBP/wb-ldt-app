@@ -1,25 +1,28 @@
 import type { EvidenceGapBadge as EvidenceGapBadgeModel } from "@/lib/evidence-gaps";
 
+// A gap is a status, so it takes a status color: destructive when blocked, the below-baseline
+// color when sparse, and plain muted text when a result simply has not been made yet.
 function toneClassName(tone: EvidenceGapBadgeModel["tone"]) {
   if (tone === "blocked") {
-    return "border-rose-200 bg-rose-50 text-rose-800";
+    return "border-destructive text-destructive";
   }
 
   if (tone === "sparse") {
-    return "border-amber-200 bg-amber-50 text-amber-800";
+    return "border-delta-below text-delta-below";
   }
 
-  return "border-slate-200 bg-slate-50 text-slate-700";
+  return "border-[var(--border-strong)] text-ink-muted";
 }
 
 export function EvidenceGapBadge({ gap }: { gap: EvidenceGapBadgeModel }) {
   return (
     <span
-      className={`inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${toneClassName(gap.tone)}`}
+      className={`inline-flex max-w-full items-baseline gap-2 border-l-2 pl-2 text-sm leading-5 ${toneClassName(gap.tone)}`}
       title={gap.detail}
     >
-      <span aria-hidden="true">Evidence gap</span>
+      <span className="font-semibold">Evidence gap</span>
       <span className="truncate">{gap.label}</span>
+      <span className="sr-only">{gap.detail}</span>
     </span>
   );
 }

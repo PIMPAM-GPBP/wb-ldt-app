@@ -1,4 +1,3 @@
-import type { AiStageResponsePayload } from "@/lib/ai/types";
 import type { ScoreWaterfallGroup } from "@/types/analytics";
 
 export type EvidenceGapTone = "missing" | "sparse" | "blocked";
@@ -59,34 +58,4 @@ export function deriveWaterfallEvidenceGap(
     label: `${missingRows} missing drivers`,
     detail: "Some score components are not shown because comparable values are missing.",
   };
-}
-
-export function deriveAiStageEvidenceGap(
-  result: AiStageResponsePayload | null | undefined,
-): EvidenceGapBadge | null {
-  if (!result) {
-    return {
-      tone: "missing",
-      label: "Not generated",
-      detail: "Run this stage to create auditable AI evidence.",
-    };
-  }
-
-  if (result.status === "failed") {
-    return {
-      tone: "blocked",
-      label: "Generation failed",
-      detail: result.errorMessage ?? "This stage did not produce a usable output.",
-    };
-  }
-
-  if (!result.sourceFingerprint) {
-    return {
-      tone: "sparse",
-      label: "Source gap",
-      detail: "This output does not include a source fingerprint yet.",
-    };
-  }
-
-  return null;
 }

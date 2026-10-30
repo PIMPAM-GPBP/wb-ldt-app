@@ -100,14 +100,6 @@ export type StrategyInventorySummaryOverride = Partial<
   >
 >;
 
-export type StrategyInventoryFilters = {
-  query?: string;
-  publicationYear?: string;
-  readinessCategory?: ReadinessCategory | "all";
-  documentType?: StrategyDocumentType | "all";
-  translationStatus?: StrategyTranslationStatus | "all";
-};
-
 export type StrategyInventoryDataset = {
   country_code: string;
   country_name: string;

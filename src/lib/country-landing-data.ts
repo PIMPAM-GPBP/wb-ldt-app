@@ -1,11 +1,10 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import type { SngDisplayRow } from "@/components/nepal/sng-display-section";
 import type { CountryHomeGroup } from "@/lib/country-home";
 import type { Country } from "@/lib/countries";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
-import type { AnalyticsDataset, MunicipalityRecord } from "@/types/analytics";
+import type { AnalyticsDataset } from "@/types/analytics";
 
 export type LocalPlanSource = {
   planUnitName: string;
@@ -47,30 +46,6 @@ export async function loadCountryDataset(country: Country) {
 
 export function normalizePlanKey(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-function latestRows(dataset: AnalyticsDataset) {
-  const latestYear = Math.max(dataset.release.year, ...dataset.years);
-  const rows = dataset.municipalities.filter((municipality) => municipality.year === latestYear);
-
-  return rows.length > 0 ? rows : dataset.municipalities;
-}
-
-function averageScore(values: Array<number | null | undefined>) {
-  const numericValues = values.filter((value): value is number => Number.isFinite(value));
-
-  if (numericValues.length === 0) {
-    return null;
-  }
-
-  const total = numericValues.reduce((sum, value) => sum + value, 0);
-  return Number((total / numericValues.length).toFixed(2));
-}
-
-function getPlanUnitName(country: Country, row: MunicipalityRecord) {
-  return country.planningDocuments.planSourceAdminLevel === "lower"
-    ? row.municipality
-    : row.province;
 }
 
 export async function loadLocalPlanSources(country: Country): Promise<LocalPlanSource[]> {
@@ -118,45 +93,6 @@ export async function loadLocalPlanSources(country: Country): Promise<LocalPlanS
 
 export function buildPlanSourceMap(sources: LocalPlanSource[]) {
   return new Map(sources.map((source) => [normalizePlanKey(source.planUnitName), source]));
-}
-
-export function buildSngRows(
-  country: Country,
-  dataset: AnalyticsDataset,
-  planSourcesByUnit: Map<string, LocalPlanSource>,
-): SngDisplayRow[] {
-  return latestRows(dataset)
-    .map((row) => {
-      const planUnitName = getPlanUnitName(country, row);
-      const planSource = planSourcesByUnit.get(normalizePlanKey(planUnitName)) ?? null;
-      const infrastructureScore = row.scores.infrastructure_score ?? null;
-      const livabilityScore = row.scores.livability_score ?? null;
-      const prosperityScore = row.scores.prosperity_score ?? null;
-
-      return {
-        rowKey: `${country.code}-${row.compositeKey}`,
-        municipality: row.municipality,
-        province: row.province,
-        population: row.context.population,
-        totalLandAreaKm2: row.context.totalLandAreaKm2,
-        infrastructureScore,
-        livabilityScore,
-        prosperityScore,
-        pilAggregate: averageScore([
-          infrastructureScore,
-          livabilityScore,
-          prosperityScore,
-        ]),
-        hasDevelopmentStrategy: Boolean(planSource),
-        strategyLevel: planSource
-          ? country.planningDocuments.planSourceAdminLevel === "lower"
-            ? country.adminLabels.lower.singular
-            : country.adminLabels.higher.singular
-          : null,
-        link: planSource?.link ?? null,
-      };
-    })
-    .sort((left, right) => left.municipality.localeCompare(right.municipality));
 }
 
 export function buildPlanAvailabilityGroups(

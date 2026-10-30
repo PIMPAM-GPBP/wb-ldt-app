@@ -12,6 +12,7 @@ import {
   installPdfJsNodePolyfills,
   installPdfWorkerGlobalForNode,
 } from "@/lib/ai/pdf-worker";
+import { getScoreThemeFromScoreId } from "@/lib/ai/score-theme";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   AiDocumentContext,
@@ -95,24 +96,6 @@ function isMissingRelationError(error: unknown) {
 }
 
 const planDocumentSourcesCache = new Map<AiDocumentContext["countryCode"], PlanDocumentSource[]>();
-
-function getScoreThemeFromScoreId(scoreId: string) {
-  const normalized = scoreId.toLowerCase();
-
-  if (normalized.startsWith("prosperity")) {
-    return "prosperity";
-  }
-
-  if (normalized.startsWith("infrastructure")) {
-    return "infrastructure";
-  }
-
-  if (normalized.startsWith("livability")) {
-    return "livability";
-  }
-
-  return null;
-}
 
 async function loadPlanDocumentSources(
   countryCode: AiDocumentContext["countryCode"],

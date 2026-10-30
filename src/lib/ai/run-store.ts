@@ -9,14 +9,26 @@ import type {
 
 export type AiRunStatus = "running" | "completed" | "failed";
 
+// Most stages are keyed to one unit. The national plan context is the same for
+// every unit in a country and theme, so it is keyed to the country instead.
+export type AiRunScope =
+  | {
+      kind: "unit";
+      municipalityId: string;
+      province: string;
+      scoreId: string;
+    }
+  | {
+      kind: "country_theme";
+      scoreTheme: string;
+    };
+
 export type AiRunCacheContractInput = {
   countryCode: string;
   stage: AiStageName;
   releaseKey: string;
   year: number;
-  municipalityId: string;
-  province: string;
-  scoreId: string;
+  scope: AiRunScope;
   modelName: string;
   promptVersion: string;
   invalidationVersion: string;

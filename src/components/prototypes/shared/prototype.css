@@ -1,0 +1,55 @@
+/*
+ * Phase 1 prototype tokens, scoped to .proto-root so production pages are untouched.
+ * Phase 2 promotes the winning set into globals.css.
+ * Palette and fonts are the existing ones; only shape, surface, and rule change.
+ */
+.proto-root {
+  --proto-header-h: 80px;
+
+  --proto-radius-control: 4px;
+  --proto-radius-panel: 6px;
+
+  --proto-surface: #ffffff;
+  --proto-surface-sunken: #f7f9fd;
+  --proto-surface-raised: #ffffff;
+  --proto-rule: rgba(55, 66, 145, 0.14);
+  --proto-rule-strong: rgba(55, 66, 145, 0.3);
+
+  --proto-ink: #1b2340;
+  --proto-muted: #586179;
+  --proto-accent: #374291;
+  --proto-link: #3675b7;
+  --proto-selection: #1b2340;
+
+  --proto-above: #23735a;
+  --proto-below: #b0472c;
+
+  --proto-elevation: 0 1px 2px rgba(2, 20, 32, 0.06), 0 6px 20px rgba(2, 20, 32, 0.1);
+
+  --pillar-prosperity: var(--chart-5);
+  --pillar-infrastructure: var(--chart-1);
+  --pillar-livability: var(--chart-3);
+
+  background: var(--proto-surface-sunken);
+  color: var(--proto-ink);
+}
+
+:root[data-theme="dark"] .proto-root,
+.dark .proto-root {
+  --proto-surface: #071c2a;
+  --proto-surface-sunken: #021420;
+  --proto-surface-raised: #0b2536;
+  --proto-rule: rgba(201, 211, 234, 0.14);
+  --proto-rule-strong: rgba(201, 211, 234, 0.3);
+
+  --proto-ink: #f5f7ff;
+  --proto-muted: #a9b4cf;
+  --proto-accent: #c9d3ea;
+  --proto-link: #8fa8df;
+  --proto-selection: #ffffff;
+
+  --proto-above: #62c39a;
+  --proto-below: #f49b78;
+
+  --proto-elevation: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.4);
+}

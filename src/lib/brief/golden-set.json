@@ -1,0 +1,459 @@
+{
+  "factSheetVersion": 2,
+  "planInventory": "plan-inventory-20261030.csv",
+  "units": [
+    {
+      "country": "NPL",
+      "unitKey": "bagmati-bhaktapur-bhaktapur",
+      "name": "Bhaktapur",
+      "province": "Bagmati",
+      "planStatus": "none",
+      "reasons": [
+        "has stored runs from Phase 0"
+      ]
+    },
+    {
+      "country": "NPL",
+      "unitKey": "koshi-jhapa-birtamod",
+      "name": "Birtamod",
+      "province": "Koshi",
+      "planStatus": "none",
+      "reasons": [
+        "highest Infrastructure Score"
+      ]
+    },
+    {
+      "country": "NPL",
+      "unitKey": "bagmati-sindhuli-golanjor",
+      "name": "Golanjor",
+      "province": "Bagmati",
+      "planStatus": "none",
+      "reasons": [
+        "lowest Infrastructure Score"
+      ]
+    },
+    {
+      "country": "NPL",
+      "unitKey": "karnali-mugu-khatyad",
+      "name": "Khatyad",
+      "province": "Karnali",
+      "planStatus": "none",
+      "reasons": [
+        "highest Livability Score"
+      ]
+    },
+    {
+      "country": "NPL",
+      "unitKey": "madhesh-siraha-karjanha",
+      "name": "Karjanha",
+      "province": "Madhesh",
+      "planStatus": "none",
+      "reasons": [
+        "lowest Livability Score"
+      ]
+    },
+    {
+      "country": "NPL",
+      "unitKey": "sudur-paschim-kailali-dhangadhi",
+      "name": "Dhangadhi",
+      "province": "Sudur Paschim",
+      "planStatus": "none",
+      "reasons": [
+        "highest Prosperity Score"
+      ]
+    },
+    {
+      "country": "NPL",
+      "unitKey": "bagmati-dolakha-melung",
+      "name": "Melung",
+      "province": "Bagmati",
+      "planStatus": "none",
+      "reasons": [
+        "lowest Prosperity Score"
+      ]
+    },
+    {
+      "country": "NPL",
+      "unitKey": "bagmati-dhading-rubi-valley",
+      "name": "Rubi Valley",
+      "province": "Bagmati",
+      "planStatus": "none",
+      "reasons": [
+        "largest rise in the Infrastructure Score"
+      ]
+    },
+    {
+      "country": "NPL",
+      "unitKey": "madhesh-sarlahi-chakraghatta",
+      "name": "Chakraghatta",
+      "province": "Madhesh",
+      "planStatus": "none",
+      "reasons": [
+        "largest fall in the Infrastructure Score"
+      ]
+    },
+    {
+      "country": "NPL",
+      "unitKey": "lumbini-kapilbastu-bijayanagar",
+      "name": "Bijayanagar",
+      "province": "Lumbini",
+      "planStatus": "none",
+      "reasons": [
+        "largest rise in the Prosperity Score"
+      ]
+    },
+    {
+      "country": "NPL",
+      "unitKey": "sudur-paschim-doti-sayal",
+      "name": "Sayal",
+      "province": "Sudur Paschim",
+      "planStatus": "none",
+      "reasons": [
+        "largest fall in the Prosperity Score"
+      ]
+    },
+    {
+      "country": "NPL",
+      "unitKey": "bagmati-dolakha-tamakoshi",
+      "name": "Tamakoshi",
+      "province": "Bagmati",
+      "planStatus": "none",
+      "reasons": [
+        "most components with nothing recorded"
+      ]
+    },
+    {
+      "country": "NPL",
+      "unitKey": "bagmati-chitawan-bharatpur",
+      "name": "Bharatpur",
+      "province": "Bagmati",
+      "planStatus": "none",
+      "reasons": [
+        "fewest components with nothing recorded"
+      ]
+    },
+    {
+      "country": "NPL",
+      "unitKey": "madhesh-rautahat-boudhimai",
+      "name": "Boudhimai",
+      "province": "Madhesh",
+      "planStatus": "none",
+      "reasons": [
+        "median Prosperity Score"
+      ]
+    },
+    {
+      "country": "NPL",
+      "unitKey": "gandaki-nawalparasi-east-baudikali",
+      "name": "Baudikali",
+      "province": "Gandaki",
+      "planStatus": "none",
+      "reasons": [
+        "typical unit in Gandaki"
+      ]
+    },
+    {
+      "country": "ZMB",
+      "unitKey": "central-central-chibombo",
+      "name": "Chibombo",
+      "province": "Central",
+      "planStatus": "text",
+      "reasons": [
+        "has stored runs from Phase 0",
+        "highest Prosperity Score"
+      ]
+    },
+    {
+      "country": "ZMB",
+      "unitKey": "southern-southern-siavonga",
+      "name": "Siavonga",
+      "province": "Southern",
+      "planStatus": "scanned",
+      "reasons": [
+        "highest Infrastructure Score"
+      ]
+    },
+    {
+      "country": "ZMB",
+      "unitKey": "southern-southern-kalomo",
+      "name": "Kalomo",
+      "province": "Southern",
+      "planStatus": "text",
+      "reasons": [
+        "lowest Infrastructure Score"
+      ]
+    },
+    {
+      "country": "ZMB",
+      "unitKey": "eastern-eastern-sinda",
+      "name": "Sinda",
+      "province": "Eastern",
+      "planStatus": "text",
+      "reasons": [
+        "highest Livability Score"
+      ]
+    },
+    {
+      "country": "ZMB",
+      "unitKey": "copperbelt-copperbelt-kitwe",
+      "name": "Kitwe",
+      "province": "Copperbelt",
+      "planStatus": "text",
+      "reasons": [
+        "lowest Livability Score"
+      ]
+    },
+    {
+      "country": "ZMB",
+      "unitKey": "eastern-eastern-vubwi",
+      "name": "Vubwi",
+      "province": "Eastern",
+      "planStatus": "text",
+      "reasons": [
+        "lowest Prosperity Score",
+        "largest fall in the Prosperity Score"
+      ]
+    },
+    {
+      "country": "ZMB",
+      "unitKey": "copperbelt-copperbelt-chingola",
+      "name": "Chingola",
+      "province": "Copperbelt",
+      "planStatus": "text",
+      "reasons": [
+        "largest rise in the Infrastructure Score"
+      ]
+    },
+    {
+      "country": "ZMB",
+      "unitKey": "southern-southern-kazungula",
+      "name": "Kazungula",
+      "province": "Southern",
+      "planStatus": "text",
+      "reasons": [
+        "largest fall in the Infrastructure Score"
+      ]
+    },
+    {
+      "country": "ZMB",
+      "unitKey": "western-western-nalolo",
+      "name": "Nalolo",
+      "province": "Western",
+      "planStatus": "text",
+      "reasons": [
+        "largest rise in the Prosperity Score"
+      ]
+    },
+    {
+      "country": "ZMB",
+      "unitKey": "eastern-eastern-lusangazi",
+      "name": "Lusangazi",
+      "province": "Eastern",
+      "planStatus": "text",
+      "reasons": [
+        "most components with nothing recorded"
+      ]
+    },
+    {
+      "country": "ZMB",
+      "unitKey": "central-central-kabwe",
+      "name": "Kabwe",
+      "province": "Central",
+      "planStatus": "text",
+      "reasons": [
+        "fewest components with nothing recorded"
+      ]
+    },
+    {
+      "country": "ZMB",
+      "unitKey": "copperbelt-copperbelt-masaiti",
+      "name": "Masaiti",
+      "province": "Copperbelt",
+      "planStatus": "text",
+      "reasons": [
+        "median Prosperity Score"
+      ]
+    },
+    {
+      "country": "ZMB",
+      "unitKey": "lusaka-lusaka-lusaka",
+      "name": "Lusaka",
+      "province": "Lusaka",
+      "planStatus": "mixed",
+      "reasons": [
+        "has no readable local plan"
+      ]
+    },
+    {
+      "country": "ZMB",
+      "unitKey": "lusaka-lusaka-chirundu",
+      "name": "Chirundu",
+      "province": "Lusaka",
+      "planStatus": "scanned",
+      "reasons": [
+        "has no readable local plan"
+      ]
+    },
+    {
+      "country": "ZMB",
+      "unitKey": "luapula-luapula-lunga",
+      "name": "Lunga",
+      "province": "Luapula",
+      "planStatus": "text",
+      "reasons": [
+        "typical unit in Luapula"
+      ]
+    },
+    {
+      "country": "SRB",
+      "unitKey": "beograd-beograd-beograd-barajevo",
+      "name": "Beograd-Barajevo",
+      "province": "Beograd",
+      "planStatus": "text",
+      "reasons": [
+        "has stored runs from Phase 0"
+      ]
+    },
+    {
+      "country": "SRB",
+      "unitKey": "nisava-nisava-nis-mediana",
+      "name": "Niš-Mediana",
+      "province": "Nišava",
+      "planStatus": "failed",
+      "reasons": [
+        "highest Infrastructure Score"
+      ]
+    },
+    {
+      "country": "SRB",
+      "unitKey": "pcinja-pcinja-trgoviste",
+      "name": "Trgovište",
+      "province": "Pčinja",
+      "planStatus": "none",
+      "reasons": [
+        "lowest Infrastructure Score"
+      ]
+    },
+    {
+      "country": "SRB",
+      "unitKey": "pcinja-pcinja-surdulica",
+      "name": "Surdulica",
+      "province": "Pčinja",
+      "planStatus": "text",
+      "reasons": [
+        "highest Livability Score"
+      ]
+    },
+    {
+      "country": "SRB",
+      "unitKey": "podunavlje-podunavlje-smederevo",
+      "name": "Smederevo",
+      "province": "Podunavlje",
+      "planStatus": "failed",
+      "reasons": [
+        "lowest Livability Score"
+      ]
+    },
+    {
+      "country": "SRB",
+      "unitKey": "srem-srem-in-ija",
+      "name": "Inđija",
+      "province": "Srem",
+      "planStatus": "scanned",
+      "reasons": [
+        "highest Prosperity Score"
+      ]
+    },
+    {
+      "country": "SRB",
+      "unitKey": "pcinja-pcinja-vladicin-han",
+      "name": "Vladičin Han",
+      "province": "Pčinja",
+      "planStatus": "non_pdf",
+      "reasons": [
+        "lowest Prosperity Score",
+        "largest fall in the Prosperity Score"
+      ]
+    },
+    {
+      "country": "SRB",
+      "unitKey": "zlatibor-zlatibor-sjenica",
+      "name": "Sjenica",
+      "province": "Zlatibor",
+      "planStatus": "text",
+      "reasons": [
+        "largest rise in the Infrastructure Score"
+      ]
+    },
+    {
+      "country": "SRB",
+      "unitKey": "macva-macva-vladimirci",
+      "name": "Vladimirci",
+      "province": "Mačva",
+      "planStatus": "text",
+      "reasons": [
+        "largest rise in the Prosperity Score"
+      ]
+    },
+    {
+      "country": "SRB",
+      "unitKey": "central-banat-central-banat-nova-crnja",
+      "name": "Nova Crnja",
+      "province": "Central Banat",
+      "planStatus": "text",
+      "reasons": [
+        "most components with nothing recorded"
+      ]
+    },
+    {
+      "country": "SRB",
+      "unitKey": "beograd-beograd-beograd-cukarica",
+      "name": "Beograd-Čukarica",
+      "province": "Beograd",
+      "planStatus": "text",
+      "reasons": [
+        "fewest components with nothing recorded"
+      ]
+    },
+    {
+      "country": "SRB",
+      "unitKey": "beograd-beograd-beograd-vozdovac",
+      "name": "Beograd-Voždovac",
+      "province": "Beograd",
+      "planStatus": "text",
+      "reasons": [
+        "median Prosperity Score"
+      ]
+    },
+    {
+      "country": "SRB",
+      "unitKey": "bor-bor-negotin",
+      "name": "Negotin",
+      "province": "Bor",
+      "planStatus": "failed",
+      "reasons": [
+        "typical unit in Bor"
+      ]
+    },
+    {
+      "country": "SRB",
+      "unitKey": "branicevo-branicevo-zabari",
+      "name": "Žabari",
+      "province": "Braničevo",
+      "planStatus": "text",
+      "reasons": [
+        "typical unit in Braničevo"
+      ]
+    },
+    {
+      "country": "SRB",
+      "unitKey": "jablanica-jablanica-crna-trava",
+      "name": "Crna Trava",
+      "province": "Jablanica",
+      "planStatus": "failed",
+      "reasons": [
+        "typical unit in Jablanica"
+      ]
+    }
+  ]
+}

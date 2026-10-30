@@ -9,12 +9,6 @@ const analyticsFallbackFiles = [
   "./public/data/serbia/municipalities.geojson",
 ];
 
-const aiDocumentFiles = [
-  "./node_modules/@napi-rs/**/*",
-  "./node_modules/pdf-parse/**/*",
-  "./node_modules/pdfjs-dist/**/*",
-];
-
 const serbiaStrategyInventoryFallbackFiles = [
   "./public/data/serbia/strategy_inventory.sample.json",
 ];
@@ -37,21 +31,20 @@ const nextConfig: NextConfig = {
     "/zambia": analyticsFallbackFiles,
     "/serbia": analyticsFallbackFiles,
     "/[country]/analytics": analyticsFallbackFiles,
-    "/api/ai/indicator-narrative": analyticsFallbackFiles,
-    "/api/ai/investment-recommendations": analyticsFallbackFiles,
-    "/api/ai/plan-alignment": analyticsFallbackFiles,
-    "/api/ai/swot-analysis": analyticsFallbackFiles,
-    "/api/ai/web-context-search": analyticsFallbackFiles,
-    "/api/ai/province-plan-context": [
-      ...analyticsFallbackFiles,
-      ...aiDocumentFiles,
-    ],
-    "/api/ai/national-plan-context": [
-      ...analyticsFallbackFiles,
-      ...aiDocumentFiles,
-    ],
+    "/api/countries/[country]/scores": analyticsFallbackFiles,
+    "/api/indicators": analyticsFallbackFiles,
+    "/methodology": analyticsFallbackFiles,
+    "/about": analyticsFallbackFiles,
     "/serbia/strategy-inventory": serbiaStrategyInventoryFallbackFiles,
     "/zambia/strategy-inventory": zambiaStrategyInventoryFallbackFiles,
+  },
+  // The public roadmap and software release notes became one Data updates page on 2026-10-30;
+  // their content is in docs/roadmap/product-roadmap.md and docs/release-history.md.
+  async redirects() {
+    return [
+      { source: "/roadmap", destination: "/data-updates", permanent: false },
+      { source: "/release-notes", destination: "/data-updates", permanent: false },
+    ];
   },
 };
 

@@ -13,13 +13,37 @@ const baseScope = {
   stage: "indicator_narrative",
   releaseKey: "srb-2025-v1",
   year: 2025,
-  municipalityId: "srb-2025-v1:beograd",
-  province: "Belgrade",
-  scoreId: "prosperity_score",
+  scope: {
+    kind: "unit",
+    municipalityId: "srb-2025-v1:beograd",
+    province: "Belgrade",
+    scoreId: "prosperity_score",
+  },
   modelName: "gpt-4.1-mini",
   promptVersion: "v2",
   invalidationVersion: "v1",
 };
+
+const nationalInput = {
+  input: {
+    countryCode: "SRB",
+    scoreTheme: "prosperity",
+    evidence: [{ url: "https://example.test/national.pdf", title: "National plan" }],
+  },
+  prompt: { system: "document-parser", user: "{}" },
+  modelSettings: {},
+};
+
+function buildNationalContract(overrides = {}) {
+  return buildAiRunCacheContract({
+    ...baseScope,
+    stage: "national_plan_context",
+    modelName: "document-parser",
+    scope: { kind: "country_theme", scoreTheme: "prosperity" },
+    ...nationalInput,
+    ...overrides,
+  });
+}
 
 test("stable fingerprints are independent of object key insertion order", () => {
   const left = createStableFingerprint({
@@ -112,4 +136,30 @@ test("only completed AI runs are reusable cache hits", () => {
   assert.equal(isCacheReusableRunStatus("completed"), true);
   assert.equal(isCacheReusableRunStatus("failed"), false);
   assert.equal(isCacheReusableRunStatus("running"), false);
+});
+
+test("unit-scoped cache keys differ between two units with identical inputs", () => {
+  const shared = {
+    input: { evidence: [{ indicatorId: "jobs" }] },
+    prompt: { system: "system prompt", user: "user prompt" },
+    modelSettings: {},
+  };
+  const beograd = buildAiRunCacheContract({ ...baseScope, ...shared });
+  const novi = buildAiRunCacheContract({
+    ...baseScope,
+    scope: { ...baseScope.scope, municipalityId: "srb-2025-v1:novi-sad", province: "Vojvodina" },
+    ...shared,
+  });
+
+  assert.notEqual(beograd.cacheKey, novi.cacheKey);
+});
+
+test("country-theme scope separates themes, releases, models, and prompt versions", () => {
+  const base = buildNationalContract();
+
+  assert.notEqual(base.cacheKey, buildNationalContract({ scope: { kind: "country_theme", scoreTheme: "livability" } }).cacheKey);
+  assert.notEqual(base.cacheKey, buildNationalContract({ releaseKey: "srb-2026-v1" }).cacheKey);
+  assert.notEqual(base.cacheKey, buildNationalContract({ modelName: "document-parser-v2" }).cacheKey);
+  assert.notEqual(base.cacheKey, buildNationalContract({ promptVersion: "v3" }).cacheKey);
+  assert.notEqual(base.cacheKey, buildNationalContract({ countryCode: "NPL" }).cacheKey);
 });

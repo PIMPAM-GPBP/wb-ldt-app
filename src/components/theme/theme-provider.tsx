@@ -26,15 +26,9 @@ function getInitialTheme(): Theme {
     return "light";
   }
 
+  // Light first: the operating system's preference is ignored, and only a saved choice of dark opens dark.
   try {
-    const storedTheme = window.localStorage.getItem("ldt-theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-
-    if (storedTheme === "dark" || storedTheme === "light") {
-      return storedTheme;
-    }
-
-    return prefersDark ? "dark" : "light";
+    return window.localStorage.getItem("ldt-theme") === "dark" ? "dark" : "light";
   } catch {
     return document.documentElement.classList.contains("dark") ? "dark" : "light";
   }

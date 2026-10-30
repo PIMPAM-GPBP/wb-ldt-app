@@ -42,7 +42,7 @@ export function EcosystemLogoGrid() {
         href="https://pim-pam.net/web-applications/#gpbp"
         target="_blank"
         rel="noreferrer"
-        className="flex min-h-16 items-center rounded-sm bg-white p-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--gpb-chrome-focus)]"
+        className="flex min-h-16 items-center rounded-sm bg-[var(--gpb-chrome-plate)] p-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--gpb-chrome-focus)]"
       >
         <Image
           src={gpbLogo}
@@ -62,7 +62,7 @@ export function PimPamLogoPlate({ className }: { className?: string }) {
       target="_blank"
       rel="noreferrer"
       className={cn(
-        "inline-flex items-center rounded-sm bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--gpb-chrome-focus)]",
+        "inline-flex items-center rounded-sm bg-[var(--gpb-chrome-plate)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--gpb-chrome-focus)]",
         className,
       )}
     >

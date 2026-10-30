@@ -38,7 +38,7 @@ export function ThemeToggle({ className, labelClassName, iconClassName }: ThemeT
       size="lg"
       onClick={toggleTheme}
       className={cn(
-        "h-10 rounded-full border-[var(--border-soft)] bg-[var(--surface)] px-3 text-[var(--foreground)] hover:bg-[var(--surface-strong)]",
+        "h-10 rounded-md border-[var(--border-soft)] bg-[var(--surface)] px-3 text-[var(--foreground)] hover:bg-[var(--surface-strong)]",
         className,
       )}
       aria-label={label}

@@ -9,8 +9,15 @@ import type {
   AiStageCacheEntry,
   AiStageName,
   AiStageSourceReference,
+  AiTokenUsage,
 } from "@/lib/ai/types";
 import type { AiRunStatus } from "@/lib/ai/run-store";
+
+// Bump when a prompt changes so stored rows are labelled with the prompt that
+// produced them. AI_PROMPT_VERSION in the environment overrides this label;
+// the cache key hashes the prompt text itself, so a stale row never matches
+// a changed prompt either way.
+export const DEFAULT_AI_PROMPT_VERSION = "v4";
 
 const AI_INVALIDATION_VERSION = process.env.AI_INVALIDATION_VERSION ?? "v1";
 
@@ -24,7 +31,7 @@ function isMissingRelationError(error: unknown) {
 }
 
 export function getAiPromptVersion() {
-  return process.env.AI_PROMPT_VERSION ?? "v2";
+  return process.env.AI_PROMPT_VERSION ?? DEFAULT_AI_PROMPT_VERSION;
 }
 
 export function getAiInvalidationVersion() {
@@ -35,14 +42,20 @@ export function createFingerprint(input: unknown) {
   return createHash("sha256").update(JSON.stringify(input)).digest("hex");
 }
 
+export type AiStageCacheUnit = {
+  municipalityId: string;
+  province: string;
+};
+
 export type AiStageCacheLookup = {
   countryCode: AiDocumentContext["countryCode"];
   stage: AiStageName;
   releaseKey: string;
   year: number;
-  municipalityId: string;
-  province: string;
   scoreId: string;
+  // null reads across every unit in the country; rows are still written under
+  // the unit that generated them because the table requires one.
+  unit: AiStageCacheUnit | null;
   modelName: string;
   promptVersion: string;
   inputFingerprint: string;
@@ -51,7 +64,8 @@ export type AiStageCacheLookup = {
   inputHash?: string;
 };
 
-export type AiStageRunRecord = AiStageCacheLookup & {
+export type AiStageRunRecord = Omit<AiStageCacheLookup, "unit"> & {
+  unit: AiStageCacheUnit;
   cacheKey: string;
   sourceFingerprint: string;
   inputHash: string;
@@ -62,6 +76,8 @@ export type AiStageRunRecord = AiStageCacheLookup & {
   sourceReferences: AiStageSourceReference[];
   status: AiRunStatus;
   errorMessage: string | null;
+  tokenUsage: AiTokenUsage | null;
+  estimatedCostUsd: number | null;
 };
 
 function toNullableText(value: unknown) {
@@ -95,7 +111,7 @@ export async function loadAiStageCache(
   const supabase = getSupabaseServerClient().schema("analytics");
 
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from("ai_stage_cache")
       .select(
         "stage_name, status, rendered_output, structured_output, source_references, model_name, prompt_version, invalidation_version, updated_at, error_message, latest_run_id, cache_key, source_fingerprint, input_hash",
@@ -104,13 +120,21 @@ export async function loadAiStageCache(
       .eq("country_code", lookup.countryCode)
       .eq("release_key", lookup.releaseKey)
       .eq("year", lookup.year)
-      .eq("municipality_id", lookup.municipalityId)
-      .eq("province", lookup.province)
       .eq("score_id", lookup.scoreId)
       .eq("model_name", lookup.modelName)
       .eq("prompt_version", lookup.promptVersion)
       .eq("invalidation_version", getAiInvalidationVersion())
-      .eq("input_fingerprint", lookup.inputFingerprint)
+      .eq("input_fingerprint", lookup.inputFingerprint);
+
+    if (lookup.unit) {
+      query = query
+        .eq("municipality_id", lookup.unit.municipalityId)
+        .eq("province", lookup.unit.province);
+    }
+
+    const { data, error } = await query
+      .order("updated_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (error) {
@@ -140,22 +164,20 @@ export async function loadLatestAiStageCacheByScope({
   countryCode,
   releaseKey,
   year,
-  municipalityId,
-  province,
   scoreId,
+  unit,
 }: {
   stage: AiStageName;
   countryCode: AiDocumentContext["countryCode"];
   releaseKey: string;
   year: number;
-  municipalityId: string;
-  province: string;
   scoreId: string;
+  unit: AiStageCacheUnit | null;
 }): Promise<AiStageCacheEntry | null> {
   const supabase = getSupabaseServerClient().schema("analytics");
 
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from("ai_stage_cache")
       .select(
         "stage_name, status, rendered_output, structured_output, source_references, model_name, prompt_version, invalidation_version, updated_at, error_message, latest_run_id, cache_key, source_fingerprint, input_hash",
@@ -164,11 +186,15 @@ export async function loadLatestAiStageCacheByScope({
       .eq("country_code", countryCode)
       .eq("release_key", releaseKey)
       .eq("year", year)
-      .eq("municipality_id", municipalityId)
-      .eq("province", province)
       .eq("score_id", scoreId)
       .eq("invalidation_version", getAiInvalidationVersion())
-      .eq("status", "completed")
+      .eq("status", "completed");
+
+    if (unit) {
+      query = query.eq("municipality_id", unit.municipalityId).eq("province", unit.province);
+    }
+
+    const { data, error } = await query
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -196,7 +222,8 @@ export async function loadLatestAiStageCacheByScope({
 }
 
 export async function saveAiStageCache(
-  lookup: AiStageCacheLookup & {
+  lookup: Omit<AiStageCacheLookup, "unit"> & {
+    unit: AiStageCacheUnit;
     renderedOutput: string | null;
     structuredOutput: Record<string, unknown>;
     sourceReferences: AiStageSourceReference[];
@@ -215,8 +242,8 @@ export async function saveAiStageCache(
         country_code: lookup.countryCode,
         release_key: lookup.releaseKey,
         year: lookup.year,
-        municipality_id: lookup.municipalityId,
-        province: lookup.province,
+        municipality_id: lookup.unit.municipalityId,
+        province: lookup.unit.province,
         score_id: lookup.scoreId,
         model_name: lookup.modelName,
         prompt_version: lookup.promptVersion,
@@ -262,8 +289,8 @@ export async function saveAiStageRun(record: AiStageRunRecord): Promise<string |
         country_code: record.countryCode,
         release_key: record.releaseKey,
         year: record.year,
-        municipality_id: record.municipalityId,
-        province: record.province,
+        municipality_id: record.unit.municipalityId,
+        province: record.unit.province,
         score_id: record.scoreId,
         model_name: record.modelName,
         model_settings: record.modelSettings,
@@ -277,6 +304,8 @@ export async function saveAiStageRun(record: AiStageRunRecord): Promise<string |
         structured_output: record.structuredOutput,
         source_references: record.sourceReferences,
         error_message: record.errorMessage,
+        token_usage: record.tokenUsage ?? {},
+        estimated_cost_usd: record.estimatedCostUsd,
         completed_at: record.status === "running" ? null : now,
       })
       .select("id")

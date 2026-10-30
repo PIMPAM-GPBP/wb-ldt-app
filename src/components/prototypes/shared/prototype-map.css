@@ -1,0 +1,207 @@
+/*
+ * Shared prototype map: MapLibre chrome (zoom buttons, attribution, hover popup) restyled with the
+ * proto tokens. Every selector sits under .proto-root, so production maps are untouched.
+ * The tokens flip in dark mode on their own; only the control icons need an explicit invert.
+ */
+
+/* Canvas container. MapLibre adds position: relative; the container has to fill its wrapper instead. */
+.proto-root .proto-map-canvas {
+  position: absolute;
+  inset: 0;
+  background: var(--proto-surface-sunken);
+}
+
+.proto-root .proto-map-canvas .maplibregl-canvas:focus-visible {
+  outline: 2px solid var(--proto-link);
+  outline-offset: -2px;
+}
+
+/* Zoom buttons */
+.proto-root .maplibregl-ctrl-group,
+.proto-root .maplibregl-ctrl-group:not(:empty) {
+  overflow: hidden;
+  border: 1px solid var(--proto-rule-strong);
+  border-radius: var(--proto-radius-control);
+  background: var(--proto-surface-raised);
+  box-shadow: var(--proto-elevation);
+}
+
+.proto-root .maplibregl-ctrl-group button {
+  width: 32px;
+  height: 32px;
+  transition: background-color 120ms ease-out;
+}
+
+.proto-root .maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--proto-rule);
+}
+
+.proto-root .maplibregl-ctrl-group button:focus,
+.proto-root .maplibregl-ctrl-group button:focus:focus-visible {
+  box-shadow: none;
+}
+
+.proto-root .maplibregl-ctrl-group button:focus-visible {
+  outline: 2px solid var(--proto-link);
+  outline-offset: -2px;
+}
+
+.proto-root .maplibregl-ctrl-group button:active {
+  background-color: var(--proto-rule);
+}
+
+@media (hover: hover) {
+  .proto-root .maplibregl-ctrl-group button:not(:disabled):hover {
+    background-color: var(--proto-surface-sunken);
+  }
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .proto-root .maplibregl-ctrl-group button {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+:root[data-theme="dark"] .proto-root .maplibregl-ctrl-icon,
+.dark .proto-root .maplibregl-ctrl-icon,
+:root[data-theme="dark"] .proto-root .maplibregl-ctrl-attrib-button,
+.dark .proto-root .maplibregl-ctrl-attrib-button {
+  filter: invert(1);
+}
+
+/* Attribution: OpenFreeMap, OpenMapTiles and OpenStreetMap come from the style sources. */
+.proto-root .maplibregl-ctrl.maplibregl-ctrl-attrib {
+  border-radius: var(--proto-radius-control);
+  background: color-mix(in srgb, var(--proto-surface-raised) 88%, transparent);
+  color: var(--proto-muted);
+  font: 11px/1.45 var(--font-sans), sans-serif;
+}
+
+.proto-root .maplibregl-ctrl-attrib a {
+  color: var(--proto-link);
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .proto-root .maplibregl-ctrl-attrib a:hover {
+    text-decoration: underline;
+  }
+}
+
+.proto-root .maplibregl-ctrl-attrib a:focus-visible,
+.proto-root .maplibregl-ctrl-attrib-button:focus-visible {
+  outline: 2px solid var(--proto-link);
+  outline-offset: 1px;
+}
+
+/* Hover popup. Follows the pointer, never takes it: pointer-events stay off so the map keeps hover. */
+.proto-root .proto-map-popup,
+.proto-root .proto-map-popup .maplibregl-popup-content {
+  pointer-events: none;
+}
+
+.proto-root .proto-map-popup .maplibregl-popup-tip {
+  display: none;
+}
+
+.proto-root .proto-map-popup .maplibregl-popup-content {
+  min-width: 148px;
+  padding: 8px 10px;
+  border: 1px solid var(--proto-rule);
+  border-radius: var(--proto-radius-panel);
+  background: var(--proto-surface-raised);
+  box-shadow: var(--proto-elevation);
+  color: var(--proto-ink);
+  font: 400 12px/1.35 var(--font-sans), sans-serif;
+  animation: proto-tip-in 120ms ease-out;
+}
+
+/* Scale in from the side facing the pointer. */
+.proto-root .proto-map-popup.maplibregl-popup-anchor-top .maplibregl-popup-content,
+.proto-root .proto-map-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-content,
+.proto-root .proto-map-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-content {
+  transform-origin: top;
+}
+
+.proto-root .proto-map-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-content,
+.proto-root .proto-map-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-content,
+.proto-root .proto-map-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-content {
+  transform-origin: bottom;
+}
+
+.proto-root .proto-map-popup.maplibregl-popup-anchor-left .maplibregl-popup-content {
+  transform-origin: left;
+}
+
+.proto-root .proto-map-popup.maplibregl-popup-anchor-right .maplibregl-popup-content {
+  transform-origin: right;
+}
+
+@keyframes proto-tip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@keyframes proto-tip-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .proto-root .proto-map-popup .maplibregl-popup-content {
+    animation-name: proto-tip-fade;
+  }
+
+  .proto-root .maplibregl-ctrl-group button {
+    transition: none;
+  }
+}
+
+.proto-root .proto-tip-name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.proto-root .proto-tip-where {
+  margin-top: 1px;
+  color: var(--proto-muted);
+}
+
+.proto-root .proto-tip-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 7px;
+  padding-top: 6px;
+  border-top: 1px solid var(--proto-rule);
+}
+
+.proto-root .proto-tip-label {
+  color: var(--proto-muted);
+}
+
+.proto-root .proto-tip-value {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-heading), sans-serif;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.proto-root .proto-tip-swatch {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border: 1px solid var(--proto-rule-strong);
+  border-radius: 2px;
+}

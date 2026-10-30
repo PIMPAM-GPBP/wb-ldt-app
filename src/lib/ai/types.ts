@@ -1,5 +1,4 @@
-import type { ScoreWaterfallGroup } from "@/types/analytics";
-import type { CountryCode, CountrySlug } from "@/lib/countries";
+import type { CountryCode } from "@/lib/countries";
 
 export const aiStageNames = [
   "indicator_narrative",
@@ -52,14 +51,6 @@ export type AiStageSourceReference = {
   metadata?: Record<string, unknown>;
 };
 
-export type AiWebContextHit = {
-  title: string;
-  url: string;
-  snippet: string;
-  publishedDate: string | null;
-  score: number | null;
-};
-
 export type AiStageCacheEntry = {
   stage: AiStageName;
   status: "completed" | "failed";
@@ -77,22 +68,6 @@ export type AiStageCacheEntry = {
   invalidationVersion: string;
   updatedAt: string | null;
   errorMessage: string | null;
-};
-
-export type AiIndicatorSeriesPoint = {
-  year: number;
-  municipalityValue: number | null;
-  provinceAverage: number | null;
-  nationalAverage: number | null;
-};
-
-export type AiIndicatorSeries = {
-  componentId: string;
-  indicatorId: string;
-  label: string;
-  description: string | null;
-  points: AiIndicatorSeriesPoint[];
-  singleYearOnly: boolean;
 };
 
 export type ProvincePlanCandidate = {
@@ -117,18 +92,6 @@ export type NationalPlanSource = {
   scoreTheme: string | null;
 };
 
-export type AiTabData = {
-  scoreOptions: Array<{ id: string; label: string }>;
-  selectedScoreId: string;
-  indicatorSeries: AiIndicatorSeries[];
-  cachedStages: Partial<Record<AiStageName, AiStageCacheEntry>>;
-  provincePlanCandidates: ProvincePlanCandidate[];
-  localPlanUnitName: string;
-  localPlanUnitLabel: string;
-  localPlanAvailable: boolean;
-  localPlanUnavailableMessage: string | null;
-};
-
 export type AiStageMode = "generate" | "regenerate" | "load_cached";
 
 export type AiStageRequestPayload = {
@@ -138,6 +101,14 @@ export type AiStageRequestPayload = {
   municipalityId: string;
   scoreId: string;
   mode: AiStageMode;
+};
+
+export type AiTokenUsage = {
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  totalTokens: number;
 };
 
 export type AiStageResponsePayload = {
@@ -154,32 +125,9 @@ export type AiStageResponsePayload = {
   sourceReferences: AiStageSourceReference[];
   modelName: string;
   promptVersion: string;
+  // Present only on a fresh model generation; cache hits and document stages carry neither.
+  tokenUsage?: AiTokenUsage | null;
+  estimatedCostUsd?: number | null;
   updatedAt: string | null;
   errorMessage: string | null;
-};
-
-export type AiPipelineContext = {
-  country: {
-    code: CountryCode;
-    slug: CountrySlug;
-    name: string;
-  };
-  releaseKey: string;
-  year: number;
-  municipality: {
-    id: string;
-    name: string;
-    district: string;
-    province: string;
-  };
-  score: {
-    id: string;
-    label: string;
-  };
-  indicatorSeries: AiIndicatorSeries[];
-  waterfalls: ScoreWaterfallGroup[];
-  provincePlanCandidates: ProvincePlanCandidate[];
-  localPlanUnitName: string;
-  localPlanUnitLabel: string;
-  localPlanAvailable: boolean;
 };

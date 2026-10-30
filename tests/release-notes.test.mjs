@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("release notes use specific versioned sections", async () => {
-  const source = await readFile("src/app/release-notes/page.tsx", "utf8");
+// The software release history moved from the public page to the repository docs on 2026-10-30;
+// these checks guard that nothing was lost in the move.
+test("release history keeps its specific versioned sections", async () => {
+  const source = await readFile("docs/release-history.md", "utf8");
 
   assert.match(source, /Versioning guide/);
   assert.match(source, /Major/);

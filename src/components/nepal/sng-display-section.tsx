@@ -277,7 +277,7 @@ export function SngDisplaySection({
 
   return (
     <section className="mt-8 space-y-6">
-      <div className="rounded-[1.5rem] border border-[var(--border-soft)] bg-[var(--surface)] p-5">
+      <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] p-5">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h3 className="text-xl font-semibold text-[var(--foreground)]">
@@ -291,7 +291,7 @@ export function SngDisplaySection({
           </p>
         </div>
 
-        <div className="mt-5 overflow-x-auto rounded-[1.25rem] border border-[var(--border-soft)]">
+        <div className="mt-5 overflow-x-auto rounded-xl border border-[var(--border-soft)]">
           <div className="h-[420px] min-w-[680px] sm:h-[460px]">
             <PlotlyChart
               data={[
@@ -411,7 +411,7 @@ export function SngDisplaySection({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-[1.5rem] border border-[var(--border-soft)] bg-[var(--surface)]">
+      <div className="overflow-hidden rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]">
         <div className="flex flex-col gap-3 border-b border-[var(--border-soft)] p-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <h3 className="text-xl font-semibold text-[var(--foreground)]">
@@ -424,14 +424,14 @@ export function SngDisplaySection({
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder={`Filter ${displayLabels.lowerPlural.toLowerCase()}`}
-                className="h-10 w-full rounded-full border border-[var(--border-soft)] bg-white px-4 text-sm text-[var(--foreground)] outline-none transition-colors placeholder:text-[var(--muted-foreground)] focus:border-[var(--accent)]"
+                className="h-10 w-full rounded-md border border-[var(--border-soft)] bg-[var(--surface-strong)] px-4 text-sm text-[var(--foreground)] outline-none transition-colors placeholder:text-[var(--muted-foreground)] focus:border-[var(--accent)]"
               />
             </label>
           </div>
           <button
             type="button"
             onClick={downloadTable}
-            className="inline-flex h-10 items-center justify-center rounded-full border border-[var(--border-soft)] bg-white px-4 text-sm font-medium text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            className="inline-flex h-10 items-center justify-center rounded-md border border-[var(--border-soft)] bg-[var(--surface-strong)] px-4 text-sm font-medium text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
           >
             Export CSV
           </button>
@@ -505,7 +505,7 @@ export function SngDisplaySection({
                           href={row.link}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex rounded-full border border-[var(--border-soft)] bg-white px-3 py-1 text-xs font-medium text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                          className="inline-flex rounded-md border border-[var(--border-soft)] bg-[var(--surface-strong)] px-3 py-1 text-xs font-medium text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
                         >
                           Open source
                         </a>

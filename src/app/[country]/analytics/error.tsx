@@ -1,5 +1,12 @@
 "use client";
 
+import Link from "next/link";
+import { useParams } from "next/navigation";
+
+import { Button, buttonVariants } from "@/components/ui/button";
+import { getCountryBySlug } from "@/lib/countries";
+import { cn } from "@/lib/utils";
+
 export default function AnalyticsError({
   error,
   reset,
@@ -7,26 +14,24 @@ export default function AnalyticsError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const { country: slug } = useParams<{ country: string }>();
+  const country = getCountryBySlug(slug);
+
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6 pb-16 pt-10 sm:px-8 lg:px-12">
-      <div className="rounded-[2rem] border border-[var(--border-soft)] bg-[var(--surface-strong)] p-8 shadow-[0_18px_50px_rgba(2,20,32,0.08)]">
-        <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
-          Analytics error
-        </p>
-        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-[var(--foreground)]">
-          The analytics surface failed to load.
-        </h1>
-        <p className="mt-4 text-base leading-8 text-[var(--muted-foreground)]">
-          {error.message ||
-            "A recoverable rendering error occurred while preparing the analytics view."}
-        </p>
-        <button
-          type="button"
-          onClick={reset}
-          className="mt-6 inline-flex items-center justify-center rounded-full bg-[var(--foreground)] px-5 py-3 text-sm font-medium text-[var(--background)]"
-        >
-          Retry
-        </button>
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-6 pb-16 pt-16 sm:px-8">
+      <h1 className="font-heading text-2xl font-semibold tracking-tight text-ink">
+        Analytics did not load
+      </h1>
+      <p className="text-base leading-7 text-ink-muted">
+        {error.message || "Something went wrong while preparing this view."}
+      </p>
+      <div className="flex flex-wrap items-center gap-3 pt-2">
+        <Button size="lg" onClick={reset}>
+          Try again
+        </Button>
+        <Link href={`/${slug}`} className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
+          Back to {country?.name ?? "country page"}
+        </Link>
       </div>
     </main>
   );

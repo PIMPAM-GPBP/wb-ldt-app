@@ -71,10 +71,6 @@ export function buildCountryTrustModel({
       : planGroups.reduce((sum, group) => sum + group.sourceCount, 0);
   const readiness = planStatus(sourceCount, unitCount);
   const boundaryQuality = boundaryStatus(releaseMetadata);
-  const aiReadiness: CountryTrustStatus =
-    country.planningDocuments.aiEnabled && readiness !== "blocked"
-      ? readiness
-      : "blocked";
 
   return {
     countryName: country.name,
@@ -97,21 +93,10 @@ export function buildCountryTrustModel({
         detail: `${releaseMetadata.mapMunicipalityCount.toLocaleString("en-US")} mapped ${country.adminLabels.lower.plural.toLowerCase()}`,
       },
       {
-        label: "Plan readiness",
+        label: "Local plans",
         value: `${percentLabel(sourceCount, unitCount)} sourced`,
         status: readiness,
         detail: `${sourceCount} of ${unitCount} ${country.planningDocuments.planSourceAdminLevel === "higher" ? country.adminLabels.higher.plural.toLowerCase() : country.adminLabels.lower.plural.toLowerCase()} have plan sources`,
-      },
-      {
-        label: "AI readiness",
-        value:
-          aiReadiness === "blocked"
-            ? "Blocked"
-            : aiReadiness === "ready"
-              ? "Ready"
-              : "Partial",
-        status: aiReadiness,
-        detail: country.planningDocuments.message,
       },
     ],
     caveats: releaseMetadata.caveats,

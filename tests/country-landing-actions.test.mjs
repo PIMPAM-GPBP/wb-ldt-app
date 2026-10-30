@@ -2,36 +2,25 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { getCountryBySlug } from "../src/lib/countries.ts";
-import { getCountryLandingActions } from "../src/lib/country-landing-actions.ts";
+import { getCountryWorkspaceLinks } from "../src/lib/country-landing-actions.ts";
 
-test("Serbia country landing actions put strategy inventory next to analytics", () => {
-  const country = getCountryBySlug("serbia");
-  assert.ok(country);
+// Failure modes:
+// 1. A country page links to a strategy inventory page that does not exist (Nepal has none).
+// 2. Serbia or Zambia lose the link to the strategy inventory they do have.
 
-  const actions = getCountryLandingActions(country);
+const links = (slug) => getCountryWorkspaceLinks(getCountryBySlug(slug)).map((link) => [link.label, link.href]);
 
-  assert.deepEqual(
-    actions.map((action) => [action.label, action.href, action.align]),
-    [
-      ["Analyze municipality metrics", "/serbia/analytics", "left"],
-      ["Strategy inventory", "/serbia/strategy-inventory", "left"],
-      ["Return to Homepage", "/", "right"],
-    ],
-  );
+test("Serbia and Zambia link to their strategy inventory beside the map, compare, and brief views", () => {
+  for (const slug of ["serbia", "zambia"]) {
+    assert.deepEqual(links(slug), [
+      ["Open the map", `/${slug}/analytics`],
+      ["Compare", `/${slug}/analytics?tab=multi`],
+      ["Planning briefs", `/${slug}/analytics?tab=brief`],
+      ["Strategy inventory", `/${slug}/strategy-inventory`],
+    ]);
+  }
 });
 
-test("Zambia country landing actions put strategy inventory next to analytics", () => {
-  const country = getCountryBySlug("zambia");
-  assert.ok(country);
-
-  const actions = getCountryLandingActions(country);
-
-  assert.deepEqual(
-    actions.map((action) => [action.label, action.href, action.align]),
-    [
-      ["Analyze district metrics", "/zambia/analytics", "left"],
-      ["Strategy inventory", "/zambia/strategy-inventory", "left"],
-      ["Return to Homepage", "/", "right"],
-    ],
-  );
+test("Nepal has no strategy inventory, so its page does not link to one", () => {
+  assert.ok(!links("nepal").some(([label]) => label === "Strategy inventory"));
 });

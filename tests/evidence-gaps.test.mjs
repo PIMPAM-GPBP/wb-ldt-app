@@ -8,7 +8,6 @@ test("evidence gap helpers derive missing, sparse, and blocked badge content", a
   assert.match(source, /export type EvidenceGapBadge/);
   assert.match(source, /deriveScatterEvidenceGap/);
   assert.match(source, /deriveWaterfallEvidenceGap/);
-  assert.match(source, /deriveAiStageEvidenceGap/);
   assert.match(source, /missing/);
   assert.match(source, /sparse/);
   assert.match(source, /blocked/);
@@ -20,20 +19,14 @@ test("analytics surfaces render evidence gap badges at point of use", async () =
     "utf8",
   );
   const scatter = await readFile("src/components/analytics/scatter-2d.tsx", "utf8");
-  const waterfall = await readFile(
-    "src/components/analytics/score-waterfall-section.tsx",
-    "utf8",
-  );
-  const aiStage = await readFile(
-    "src/components/analytics/ai-stage-card.tsx",
+  const drivers = await readFile(
+    "src/components/analytics/atlas/atlas-profile.tsx",
     "utf8",
   );
 
   assert.match(badge, /Evidence gap/);
   assert.match(scatter, /deriveScatterEvidenceGap/);
   assert.match(scatter, /EvidenceGapBadge/);
-  assert.match(waterfall, /deriveWaterfallEvidenceGap/);
-  assert.match(waterfall, /EvidenceGapBadge/);
-  assert.match(aiStage, /deriveAiStageEvidenceGap/);
-  assert.match(aiStage, /EvidenceGapBadge/);
+  assert.match(drivers, /deriveWaterfallEvidenceGap/);
+  assert.match(drivers, /EvidenceGapBadge/);
 });

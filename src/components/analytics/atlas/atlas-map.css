@@ -1,0 +1,234 @@
+/*
+ * Atlas map: MapLibre chrome (zoom buttons, attribution, hover popup) restyled with the site tokens.
+ * Every selector sits under .atlas-map, so the tokens flip with the theme on their own;
+ * only the control icons need an explicit invert in dark mode.
+ */
+
+/* Canvas container. MapLibre adds position: relative; the container has to fill its wrapper instead. */
+.atlas-map .atlas-map-canvas {
+  position: absolute;
+  inset: 0;
+  background: var(--background);
+}
+
+.atlas-map .atlas-map-canvas .maplibregl-canvas:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Zoom buttons */
+.atlas-map .maplibregl-ctrl-group,
+.atlas-map .maplibregl-ctrl-group:not(:empty) {
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface-strong);
+  box-shadow: var(--elevation);
+}
+
+.atlas-map .maplibregl-ctrl-group button {
+  width: 32px;
+  height: 32px;
+  transition: background-color 150ms ease-out;
+}
+
+.atlas-map .maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--border-soft);
+}
+
+.atlas-map .maplibregl-ctrl-group button:focus,
+.atlas-map .maplibregl-ctrl-group button:focus:focus-visible {
+  box-shadow: none;
+}
+
+.atlas-map .maplibregl-ctrl-group button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.atlas-map .maplibregl-ctrl-group button:active {
+  background-color: var(--border-soft);
+}
+
+@media (hover: hover) {
+  .atlas-map .maplibregl-ctrl-group button:not(:disabled):hover {
+    background-color: var(--background);
+  }
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .atlas-map .maplibregl-ctrl-group button {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+:root[data-theme="dark"] .atlas-map .maplibregl-ctrl-icon,
+.dark .atlas-map .maplibregl-ctrl-icon,
+:root[data-theme="dark"] .atlas-map .maplibregl-ctrl-attrib-button,
+.dark .atlas-map .maplibregl-ctrl-attrib-button {
+  filter: invert(1);
+}
+
+/* Attribution: OpenFreeMap, OpenMapTiles and OpenStreetMap come from the style sources. */
+.atlas-map .maplibregl-ctrl.maplibregl-ctrl-attrib {
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface-strong) 88%, transparent);
+  color: var(--ink-muted);
+  font: 11px/1.45 var(--font-sans), sans-serif;
+}
+
+.atlas-map .maplibregl-ctrl-attrib a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .atlas-map .maplibregl-ctrl-attrib a:hover {
+    text-decoration: underline;
+  }
+}
+
+.atlas-map .maplibregl-ctrl-attrib a:focus-visible,
+.atlas-map .maplibregl-ctrl-attrib-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Hover popup. Follows the pointer, never takes it: pointer-events stay off so the map keeps hover. */
+.atlas-map .atlas-map-popup,
+.atlas-map .atlas-map-popup .maplibregl-popup-content {
+  pointer-events: none;
+}
+
+.atlas-map .atlas-map-popup .maplibregl-popup-tip {
+  display: none;
+}
+
+.atlas-map .atlas-map-popup .maplibregl-popup-content {
+  min-width: 148px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface-strong);
+  box-shadow: var(--elevation);
+  color: var(--ink);
+  font: 400 12px/1.35 var(--font-sans), sans-serif;
+  animation: atlas-tip-in 150ms ease-out;
+}
+
+/* Scale in from the side facing the pointer. */
+.atlas-map .atlas-map-popup.maplibregl-popup-anchor-top .maplibregl-popup-content,
+.atlas-map .atlas-map-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-content,
+.atlas-map .atlas-map-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-content {
+  transform-origin: top;
+}
+
+.atlas-map .atlas-map-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-content,
+.atlas-map .atlas-map-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-content,
+.atlas-map .atlas-map-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-content {
+  transform-origin: bottom;
+}
+
+.atlas-map .atlas-map-popup.maplibregl-popup-anchor-left .maplibregl-popup-content {
+  transform-origin: left;
+}
+
+.atlas-map .atlas-map-popup.maplibregl-popup-anchor-right .maplibregl-popup-content {
+  transform-origin: right;
+}
+
+@keyframes atlas-tip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@keyframes atlas-tip-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas-map .atlas-map-popup .maplibregl-popup-content {
+    animation-name: atlas-tip-fade;
+  }
+
+  .atlas-map .maplibregl-ctrl-group button {
+    transition: none;
+  }
+}
+
+/* Popup text. Long names and units wrap inside the 260px popup instead of running past its edge. */
+.atlas-map .atlas-tip-name,
+.atlas-map .atlas-tip-where,
+.atlas-map .atlas-tip-label,
+.atlas-map .atlas-tip-unit {
+  overflow-wrap: anywhere;
+}
+
+.atlas-map .atlas-tip-name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.atlas-map .atlas-tip-where {
+  margin-top: 1px;
+  color: var(--ink-muted);
+}
+
+.atlas-map .atlas-tip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 12px;
+  margin-top: 7px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.atlas-map .atlas-tip-label {
+  flex: 1 1 5rem;
+  min-width: 0;
+  color: var(--ink-muted);
+}
+
+.atlas-map .atlas-tip-value {
+  display: inline-flex;
+  flex: none;
+  max-width: 100%;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--font-heading), sans-serif;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.atlas-map .atlas-tip-value[data-empty] {
+  color: var(--ink-muted);
+  font-family: var(--font-sans), sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.atlas-map .atlas-tip-unit {
+  min-width: 0;
+  color: var(--ink-muted);
+  font-family: var(--font-sans), sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.atlas-map .atlas-tip-swatch {
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+}

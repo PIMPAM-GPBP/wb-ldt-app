@@ -1,187 +1,234 @@
-import {
-  ArrowUpRight,
-  BookOpen,
-  ExternalLink,
-  FileText,
-  FolderOpen,
-  MapPin,
-  Presentation,
-} from "lucide-react";
+import type { Metadata } from "next";
+import Link from "next/link";
 
-import {
-  countryResourcePacks,
-  ldtResourceFiles,
-  type CountryResourcePack,
-  type ResourceFile,
-} from "@/lib/resources";
+import { ARTICLE_LINK, ArticlePage, ArticleSection, PROSE } from "@/components/layout/article";
+import { formatBytes, getDownloads, type Download } from "@/lib/downloads";
+import { countryResourcePacks, ldtResourceFiles, type ResourceFile } from "@/lib/resources";
+import { cn } from "@/lib/utils";
 
-function ResourceIcon({ format }: { format: ResourceFile["format"] }) {
-  if (format === "Slide deck") {
-    return <Presentation aria-hidden="true" className="size-5" />;
-  }
+export const metadata: Metadata = {
+  title: "Data and documents | Local Development Tracker",
+  description: "Download the LDT's scores, indicators, and boundaries for every country, and the guides, briefings, and country materials about it.",
+};
 
-  if (format === "Notebook") {
-    return <BookOpen aria-hidden="true" className="size-5" />;
-  }
+const TOC = [
+  { id: "scores", label: "Scores" },
+  { id: "indicators", label: "Indicators and boundaries" },
+  { id: "using", label: "Using the data" },
+  { id: "guides", label: "Guides" },
+  { id: "documents", label: "Core LDT materials" },
+  { id: "countries", label: "Country materials" },
+];
 
-  return <FileText aria-hidden="true" className="size-5" />;
-}
+const formatDate = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
-function ResourceCard({ resource }: { resource: ResourceFile }) {
+function FileLink({ file, label }: { file: Download; label?: string }) {
   return (
-    <a
-      href={resource.href}
-      target="_blank"
-      rel="noreferrer"
-      className="group flex min-h-56 flex-col rounded-[1.25rem] border border-[var(--border-soft)] bg-[var(--surface-strong)] p-5 shadow-[0_14px_34px_rgba(2,20,32,0.07)] transition duration-200 hover:-translate-y-0.5 hover:border-[var(--border-strong)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--accent)]"
-    >
-      <span className="inline-flex size-11 items-center justify-center rounded-[0.95rem] bg-[var(--accent-soft)] text-[var(--foreground)]">
-        <ResourceIcon format={resource.format} />
-      </span>
-      <span className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
-        {resource.format}
-      </span>
-      <h3 className="mt-2 text-xl font-semibold leading-7 text-[var(--foreground)]">
-        {resource.title}
-      </h3>
-      <p className="mt-3 flex-1 text-sm leading-7 text-[var(--muted-foreground)]">
-        {resource.description}
-      </p>
-      <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[var(--accent)]">
-        Open resource
-        <ArrowUpRight aria-hidden="true" className="size-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+    <a href={file.href} download={file.fileName} className={ARTICLE_LINK}>
+      {label ?? file.fileName}
+      <span className="sr-only">
+        , {file.format}, {formatBytes(file.bytes)}
       </span>
     </a>
   );
 }
 
-function CountryResourceCard({ pack }: { pack: CountryResourcePack }) {
+/** A document as a row: title link, format, and one line on what it is for. */
+function ResourceRow({ resource }: { resource: ResourceFile }) {
   return (
-    <article className="flex h-full flex-col rounded-[1.25rem] border border-[var(--border-soft)] bg-[var(--surface-strong)] p-5 shadow-[0_14px_34px_rgba(2,20,32,0.07)]">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
-            {pack.country}
-          </p>
-          <h3 className="mt-2 text-xl font-semibold text-[var(--foreground)]">
-            {pack.title}
-          </h3>
-        </div>
-        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-[0.85rem] bg-[var(--accent-soft)] text-[var(--foreground)]">
-          <MapPin aria-hidden="true" className="size-5" />
-        </span>
+    <li className="grid gap-x-8 gap-y-1 py-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+      <div>
+        <p className="text-xs font-medium text-ink-muted">{resource.format}</p>
+        <a href={resource.href} target="_blank" rel="noreferrer" className={cn(ARTICLE_LINK, "mt-1 inline-block font-heading text-lg leading-snug font-semibold")}>
+          {resource.title}
+          <span className="sr-only"> (opens in a new tab)</span>
+        </a>
       </div>
-
-      <p className="mt-4 text-sm leading-7 text-[var(--muted-foreground)]">
-        {pack.description}
-      </p>
-
-      <a
-        href={pack.href}
-        target="_blank"
-        rel="noreferrer"
-        className="mt-5 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[var(--accent)] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--accent)]"
-      >
-        <FolderOpen aria-hidden="true" className="size-4" />
-        Open country folder
-      </a>
-
-      <div className="mt-5 border-t border-[var(--border-soft)] pt-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
-          Included materials
-        </p>
-
-        {pack.files.length > 0 ? (
-          <ul role="list" className="mt-3 space-y-2">
-            {pack.files.map((resource) => (
-              <li key={resource.href}>
-                <a
-                  href={resource.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="group/item flex min-h-14 items-start justify-between gap-3 rounded-[0.85rem] px-3 py-2 transition hover:bg-[var(--accent-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-                >
-                  <span>
-                    <span className="block text-sm font-semibold leading-6 text-[var(--foreground)]">
-                      {resource.title}
-                    </span>
-                    <span className="mt-1 inline-flex rounded-full border border-[var(--border-soft)] px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">
-                      {resource.format}
-                    </span>
-                  </span>
-                  <ExternalLink
-                    aria-hidden="true"
-                    className="mt-1 size-4 shrink-0 text-[var(--muted-foreground)] transition group-hover/item:text-[var(--accent)]"
-                  />
-                </a>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-3 rounded-[0.85rem] border border-dashed border-[var(--border-soft)] p-3 text-sm leading-6 text-[var(--muted-foreground)]">
-            {pack.emptyState}
-          </p>
-        )}
-      </div>
-    </article>
+      <p className="text-base leading-7 text-ink md:pt-5">{resource.description}</p>
+    </li>
   );
 }
 
-export default function ResourcesPage() {
+export default async function ResourcesPage() {
+  const downloads = await getDownloads();
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-12 px-6 pb-16 pt-10 sm:px-8 lg:px-12">
-      <section className="max-w-4xl">
-        <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
-          Resources
+    <ArticlePage
+      kicker="Data"
+      title="Data and documents"
+      lede={
+        <p>
+          The scores, indicators, and boundaries behind the LDT for every country, followed by the guides, briefings, and country materials about it.
         </p>
-        <h1 className="mt-4 text-4xl font-semibold tracking-tight text-[var(--foreground)] sm:text-5xl">
-          LDT documents and working materials
-        </h1>
-        <p className="mt-5 max-w-3xl text-base leading-8 text-[var(--muted-foreground)]">
-          A curated set of reference materials for understanding the Local Development
-          Tracker, sharing the GPB approach, and supporting country-facing discussions.
-        </p>
-      </section>
-
-      <section>
-        <div className="border-b border-[var(--border-soft)] pb-5">
-          <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-            Core LDT materials
-          </p>
-          <h2 className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
-            Start here
-          </h2>
+      }
+      toc={TOC}
+    >
+      <ArticleSection
+        id="scores"
+        title="Scores"
+        intro={<p>Every unit&apos;s three scores and their components, for every year in the edition, with one row per unit and year.</p>}
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[40rem] border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-[var(--border-strong)] text-ink-muted">
+                <th scope="col" className="py-2 pr-4 font-medium">Country</th>
+                <th scope="col" className="py-2 pr-4 font-medium">File</th>
+                <th scope="col" className="py-2 pr-4 font-medium">Edition</th>
+                <th scope="col" className="py-2 pr-4 font-medium">Rows</th>
+                <th scope="col" className="py-2 font-medium">Data as of</th>
+              </tr>
+            </thead>
+            <tbody>
+              {downloads.countries.map((entry) => (
+                <tr key={entry.country.slug} className="border-b border-[var(--border-soft)] align-top text-ink">
+                  <th scope="row" className="py-3 pr-4 font-semibold">
+                    <Link href={`/${entry.country.slug}`} className={ARTICLE_LINK}>
+                      {entry.country.name}
+                    </Link>
+                  </th>
+                  <td className="py-3 pr-4">
+                    <FileLink file={entry.scores} />
+                    <span className="block text-xs text-ink-muted">
+                      {entry.scores.format}, {formatBytes(entry.scores.bytes)}
+                    </span>
+                  </td>
+                  <td className="py-3 pr-4 tabular-nums">
+                    {entry.edition}
+                    <span className="block text-xs text-ink-muted">
+                      {entry.years[0]} to {entry.years.at(-1)}
+                    </span>
+                  </td>
+                  <td className="py-3 pr-4 tabular-nums">{entry.scores.rows?.toLocaleString("en-US")}</td>
+                  <td className="py-3 tabular-nums">{formatDate(entry.generatedAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
+      </ArticleSection>
 
-        <div className="mt-6 grid gap-5 md:grid-cols-3">
-          {ldtResourceFiles.map((resource) => (
-            <ResourceCard key={resource.href} resource={resource} />
-          ))}
-        </div>
-      </section>
-
-      <section className="border-t border-[var(--border-soft)] pt-6">
-        <div className="flex flex-col gap-3 pb-5 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-              Country resource spaces
+      <ArticleSection id="indicators" title="Indicators and boundaries">
+        <ul className="divide-y divide-[var(--border-soft)] border-y border-[var(--border-soft)]">
+          <li className="grid gap-x-8 gap-y-1 py-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+            <div>
+              <p className="text-xs font-medium text-ink-muted">
+                {downloads.indicators.format}, {formatBytes(downloads.indicators.bytes)}
+              </p>
+              <p className="mt-1 font-heading text-lg leading-snug font-semibold">
+                <FileLink file={downloads.indicators} label="Indicator list" />
+              </p>
+            </div>
+            <p className="text-base leading-7 text-ink md:pt-5">
+              All {downloads.indicators.rows} indicators: what each measures, the component it feeds, which direction scores higher, the years recorded, and
+              its sources. The same list is on the{" "}
+              <Link href="/methodology#indicators" className={ARTICLE_LINK}>
+                methodology
+              </Link>{" "}
+              page.
             </p>
-            <h2 className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
-              Documents, demos, and analyses by country
-            </h2>
-          </div>
-          <p className="max-w-xl text-sm leading-7 text-[var(--muted-foreground)]">
+          </li>
+          {downloads.countries.map((entry) => (
+            <li key={entry.country.slug} className="grid gap-x-8 gap-y-1 py-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+              <div>
+                <p className="text-xs font-medium text-ink-muted">
+                  {entry.boundaries.format}, {formatBytes(entry.boundaries.bytes)}
+                </p>
+                <p className="mt-1 font-heading text-lg leading-snug font-semibold">
+                  <FileLink file={entry.boundaries} label={`${entry.country.name} boundaries`} />
+                </p>
+              </div>
+              <p className="text-base leading-7 text-ink md:pt-5">
+                The {entry.country.adminLabels.lower.plural.toLowerCase()} the map draws, keyed by the same names as the scores file.
+              </p>
+            </li>
+          ))}
+        </ul>
+      </ArticleSection>
+
+      <ArticleSection id="using" title="Using the data">
+        <div className={PROSE}>
+          <p>
+            Name the country&apos;s edition and the date of its data when you use these files;{" "}
+            <Link href="/about#cite" className={ARTICLE_LINK}>
+              About
+            </Link>{" "}
+            shows an example. Each indicator&apos;s sources are on the methodology page, and{" "}
+            <Link href="/data-updates" className={ARTICLE_LINK}>
+              Data updates
+            </Link>{" "}
+            says which years compare and lists known issues in the data.
+          </p>
+        </div>
+      </ArticleSection>
+
+      <ArticleSection id="guides" title="Guides">
+        <ul className="divide-y divide-[var(--border-soft)] border-y border-[var(--border-soft)]">
+          {[
+            { href: "/resources/user-guide", title: "User guide", format: "Web page", description: "How to find a place, read its scores, compare it with others, read its planning brief, and download the data." },
+            { href: "/resources/quickstart", title: "Local Development Tracker QuickStart", format: "Web page, 23 May 2026", description: "The note on the LDT's motivation, method, and early country applications in Nepal, Serbia, and Zambia." },
+          ].map((guide) => (
+            <li key={guide.href} className="grid gap-x-8 gap-y-1 py-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+              <div>
+                <p className="text-xs font-medium text-ink-muted">{guide.format}</p>
+                <Link href={guide.href} className={cn(ARTICLE_LINK, "mt-1 inline-block font-heading text-lg leading-snug font-semibold")}>
+                  {guide.title}
+                </Link>
+              </div>
+              <p className="text-base leading-7 text-ink md:pt-5">{guide.description}</p>
+            </li>
+          ))}
+        </ul>
+      </ArticleSection>
+
+      <ArticleSection id="documents" title="Core LDT materials">
+        <ul className="divide-y divide-[var(--border-soft)] border-y border-[var(--border-soft)]">
+          {ldtResourceFiles.map((resource) => (
+            <ResourceRow key={resource.href} resource={resource} />
+          ))}
+        </ul>
+      </ArticleSection>
+
+      <ArticleSection
+        id="countries"
+        title="Documents, demos, and analyses by country"
+        intro={
+          <p>
             Each workspace groups country-facing reference material in one place, with
             direct links to visible files and a folder link for anything added later.
           </p>
-        </div>
-
-        <div className="mt-6 grid gap-5 lg:grid-cols-3">
+        }
+      >
+        <div className="grid gap-x-10 gap-y-10 md:grid-cols-3">
           {countryResourcePacks.map((pack) => (
-            <CountryResourceCard key={pack.href} pack={pack} />
+            <section key={pack.country} aria-labelledby={`pack-${pack.country}`} className="border-t border-[var(--border-strong)] pt-4">
+              <h3 id={`pack-${pack.country}`} className="font-heading text-xl leading-snug font-semibold text-ink">
+                {pack.title}
+              </h3>
+              <p className="mt-2 text-base leading-7 text-ink">{pack.description}</p>
+              <a href={pack.href} target="_blank" rel="noreferrer" className={cn(ARTICLE_LINK, "mt-3 inline-block text-sm")}>
+                Open country folder
+                <span className="sr-only"> for {pack.country} (opens in a new tab)</span>
+              </a>
+              <p className="mt-6 text-xs font-medium text-ink-muted">Included materials</p>
+              {pack.files.length > 0 ? (
+                <ul className="mt-2 divide-y divide-[var(--border-soft)] border-y border-[var(--border-soft)]">
+                  {pack.files.map((resource) => (
+                    <li key={resource.href} className="py-2.5">
+                      <a href={resource.href} target="_blank" rel="noreferrer" className={cn(ARTICLE_LINK, "text-sm leading-snug")}>
+                        {resource.title}
+                        <span className="sr-only"> (opens in a new tab)</span>
+                      </a>
+                      <span className="mt-0.5 block text-xs text-ink-muted">{resource.format}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-sm leading-6 text-ink-muted">{pack.emptyState}</p>
+              )}
+            </section>
           ))}
         </div>
-      </section>
-    </main>
+      </ArticleSection>
+    </ArticlePage>
   );
 }

@@ -1,142 +1,96 @@
-import Image from "next/image";
+import Link from "next/link";
 
-import pilDiagram from "../../images/PIL Diagram v2.png";
-import { CountrySelector } from "@/components/home/country-selector";
-import {
-  getAllReleaseMetadata,
-  getGlobalReleaseSummary,
-} from "@/lib/release-metadata";
+import { PillarMapSwitch } from "@/components/maps/pillar-map-switch";
+import { countries } from "@/lib/countries";
+import { PILLAR_MAP_CLASSES, getPillarMap, pillarMapStyles } from "@/lib/maps/pillar-maps";
+import { getAllReleaseMetadata, getGlobalReleaseSummary } from "@/lib/release-metadata";
 
-const releaseMetadata = getAllReleaseMetadata();
-const releaseSummary = getGlobalReleaseSummary();
+const LINK =
+  "rounded-sm text-accent underline underline-offset-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent focus-visible:outline-solid";
 
-const capabilityCards = [
-  {
-    title: "Compare places",
-    body: "Inspect municipalities across composite score space, peer positions, and provincial or national baselines.",
-  },
-  {
-    title: "Read the map",
-    body: "Move from pillar and indicator choropleths into municipality context, coverage, and score drivers.",
-  },
-  {
-    title: "Trace evidence",
-    body: "Keep methodology, plan sources, release notes, and data limitations close to each analytical result.",
-  },
-  {
-    title: "Synthesize plans",
-    body: "Use AI-assisted narratives, SWOT framing, and investment recommendations as inspectable planning outputs.",
-  },
-] as const;
+/**
+ * The home page leads with the places measured: one small map per country, colored by the
+ * same pillar, with each country's unit count and the ways into its data.
+ */
+export default async function Home() {
+  const releaseSummary = getGlobalReleaseSummary();
+  const releases = [...getAllReleaseMetadata()].sort((a, b) => a.countryName.localeCompare(b.countryName));
+  const live = countries.filter((country) => country.analyticsStatus === "live");
+  const maps = new Map((await Promise.all(live.map((country) => getPillarMap(country, 420, 320)))).map((map) => [map.slug, map]));
+  const names = new Intl.ListFormat("en", { type: "conjunction" }).format(releases.map((release) => release.countryName));
 
-const homeStats = [
-  {
-    value: String(releaseSummary.countryCount),
-    label: "Country workspaces",
-  },
-  {
-    value: releaseSummary.totalLoadedLocalUnits.toLocaleString("en-US"),
-    label: "LSGs currently loaded",
-  },
-  {
-    value: String(releaseSummary.latestDataYear),
-    label: "Latest data year",
-  },
-  {
-    value: releaseSummary.methodologyVersion,
-    label: "Methodology version",
-  },
-] as const;
-
-export default function Home() {
   return (
-    <main className="flex flex-1 flex-col">
-      <section className="border-b border-[var(--border-soft)] bg-[radial-gradient(circle_at_top,var(--hero-glow),transparent_38%),linear-gradient(180deg,var(--hero-wash-start),var(--hero-wash-end))]">
-        <div className="mx-auto w-full max-w-7xl px-6 py-12 sm:px-8 lg:px-12 lg:py-16">
-          <div className="max-w-4xl">
-            <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--foreground)] sm:text-5xl lg:text-6xl">
-              Local Development Tracker for public investment decisions.
-            </h1>
-            <p className="mt-6 max-w-3xl text-base leading-8 text-[var(--muted-foreground)] sm:text-lg">
-              A country workspace for comparing local development conditions, reading
-              municipality-level score drivers, and linking planning evidence to public investment
-              choices.
-            </p>
-            <div className="mt-8 grid max-w-[60rem] gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {homeStats.map((stat) => (
-                <div
-                  key={stat.label}
-                  className="flex min-h-28 flex-col justify-between rounded-[1.25rem] border border-[var(--border-soft)] bg-[var(--surface-strong)] p-5 shadow-[0_14px_34px_rgba(2,20,32,0.07)]"
-                >
-                  <p className="font-mono text-2xl font-semibold text-[var(--foreground)]">
-                    {stat.value}
-                  </p>
-                  <p className="mt-3 text-[11px] font-medium uppercase leading-5 tracking-[0.14em] text-[var(--muted-foreground)]">
-                    {stat.label}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <p className="mt-4 max-w-3xl text-xs leading-6 text-[var(--muted-foreground)]">
-              Loaded releases: {releaseMetadata.map((release) => release.releaseKey).join(", ")}.
-              Metadata is shared across pages, exports, and AI brief provenance.
-            </p>
-            <CountrySelector />
-          </div>
-        </div>
-      </section>
+    <main className="flex-1">
+      <style>{pillarMapStyles()}</style>
+      <div className="mx-auto w-full max-w-7xl px-4 pt-14 pb-20 sm:px-6 lg:px-10 lg:pt-20">
+        <h1 className="max-w-4xl font-heading text-4xl leading-[1.08] font-semibold tracking-tight text-ink sm:text-5xl lg:text-[3.5rem]">
+          Local development scores for {releaseSummary.totalLoadedLocalUnits.toLocaleString("en-US")} local governments in {names}
+        </h1>
+        <p className="mt-6 max-w-2xl text-lg leading-8 text-ink-muted">
+          Each one is scored from 0 to 100 on Prosperity, Infrastructure, and Livability, using satellite and open data. Open a country to map
+          the scores, compare places, and read a planning brief for any of them.
+        </p>
 
-      <section className="mx-auto mt-12 w-full max-w-7xl px-6 sm:px-8 lg:px-12">
-        <article className="overflow-hidden rounded-[1.7rem] border border-[var(--border-soft)] bg-white/78 p-5 shadow-[0_18px_45px_rgba(2,20,32,0.08)] sm:p-7">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                Public investment lens
-              </p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--foreground)]">
-                From local evidence to investment decisions
-              </h2>
-            </div>
-            <p className="max-w-2xl text-sm leading-7 text-[var(--muted-foreground)]">
-              The PIL framework links local development conditions, planning evidence,
-              and investment prioritization so users can move from diagnostics to
-              practical public investment conversations.
-            </p>
-          </div>
-          <div className="mt-6 rounded-[1.25rem] border border-[var(--border-soft)] bg-white p-4">
-            <Image
-              src={pilDiagram}
-              alt="PIL framework diagram linking planning evidence, investment logic, and local development outcomes"
-              className="h-auto w-full rounded-[1rem]"
-              priority
-            />
-          </div>
-        </article>
-      </section>
+        <section aria-label="Countries" className="mt-14 border-t border-[var(--border-soft)] pt-6">
+          <PillarMapSwitch classes={PILLAR_MAP_CLASSES} name="home-pillar" note="Fifths of units within each country">
+            <ul className="mt-8 grid gap-x-10 gap-y-14 md:grid-cols-3">
+              {releases.map((release) => {
+                const country = countries.find((entry) => entry.slug === release.countrySlug);
+                const map = maps.get(release.countrySlug);
+                const unitPlural = country?.adminLabels.lower.plural.toLowerCase() ?? "local governments";
+                return (
+                  <li key={release.countrySlug}>
+                    <Link
+                      href={`/${release.countrySlug}`}
+                      className="group block rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent focus-visible:outline-solid"
+                    >
+                      <div className="flex h-56 items-center justify-center sm:h-64">
+                        {map ? (
+                          <svg aria-hidden="true" viewBox={`0 0 ${map.width} ${map.height}`} preserveAspectRatio="xMidYMid meet" className="h-full w-full">
+                            {map.units.map((unit) => (
+                              <path key={unit.key} d={unit.d} data-p={unit.classes.prosperity} data-i={unit.classes.infrastructure} data-l={unit.classes.livability} />
+                            ))}
+                          </svg>
+                        ) : null}
+                      </div>
+                      <h2 className="mt-5 font-heading text-2xl leading-tight font-semibold text-ink group-hover:underline group-hover:underline-offset-4">
+                        {release.countryName}
+                      </h2>
+                    </Link>
+                    <p className="mt-1 text-sm text-ink-muted">
+                      <span className="font-heading text-base font-semibold tabular-nums text-ink">{release.analyticsMunicipalityCount.toLocaleString("en-US")}</span>{" "}
+                      {unitPlural} · {release.latestDataYear} data
+                    </p>
+                    <p className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+                      <Link href={`/${release.countrySlug}/analytics`} className={LINK}>
+                        Map
+                      </Link>
+                      <Link href={`/${release.countrySlug}/analytics?tab=multi`} className={LINK}>
+                        Compare
+                      </Link>
+                      <Link href={`/${release.countrySlug}/analytics?tab=brief`} className={LINK}>
+                        Planning briefs
+                      </Link>
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          </PillarMapSwitch>
+        </section>
 
-      <section className="mx-auto my-12 w-full max-w-7xl px-6 sm:px-8 lg:px-12">
-        <article className="rounded-[1.7rem] border border-[var(--border-soft)] bg-[linear-gradient(180deg,var(--panel-gradient-start),var(--panel-gradient-end))] p-6 shadow-[0_18px_45px_var(--surface-shadow)] sm:p-7">
-          <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-            What the LDT provides
-          </p>
-          <div className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
-            {capabilityCards.map((capability) => (
-              <div
-                key={capability.title}
-                className="rounded-[1.2rem] border border-[var(--border-soft)] bg-white/75 p-5"
-              >
-                <h2 className="text-lg font-semibold text-[var(--foreground)]">
-                  {capability.title}
-                </h2>
-                <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">
-                  {capability.body}
-                </p>
-              </div>
-            ))}
-          </div>
-        </article>
-      </section>
-
+        <p className="mt-16 flex flex-wrap gap-x-6 gap-y-2 border-t border-[var(--border-soft)] pt-6 text-sm">
+          <Link href="/methodology" className={LINK}>
+            How the scores are made
+          </Link>
+          <Link href="/about" className={LINK}>
+            About the Local Development Tracker
+          </Link>
+          <Link href="/resources" className={LINK}>
+            Documents and country materials
+          </Link>
+        </p>
+      </div>
     </main>
   );
 }

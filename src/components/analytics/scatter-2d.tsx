@@ -1,21 +1,25 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useMemo, useOptimistic, useTransition } from "react";
 
 import { EvidenceGapBadge } from "@/components/analytics/evidence-gap-badge";
-import { PlotlyChart } from "@/components/analytics/plotly-chart";
-import { useTheme } from "@/components/theme/theme-provider";
+import { PlotlyChart, getPlotlyTheme, plotlyAxis, plotlyLayout } from "@/components/analytics/plotly-chart";
+import { useRenderTheme } from "@/components/analytics/use-render-theme";
+import { useSearchParamUpdater } from "@/components/analytics/use-search-param-updater";
+import { Button } from "@/components/ui/button";
 import type { AdminLabels } from "@/lib/countries";
 import { buildCsv, downloadCsv } from "@/lib/csv";
 import { deriveScatterEvidenceGap } from "@/lib/evidence-gaps";
+import type { MetricDefinition } from "@/types/analytics";
 
-type Scatter2DCardProps = {
-  xLabel: string;
-  yLabel: string;
+export type Scatter2DCardProps = {
+  xMetric: MetricDefinition;
+  yMetric: MetricDefinition;
+  /** The metrics the axis selects offer. */
+  scoreMetrics: MetricDefinition[];
+  /** The selected unit's higher admin area; its units stand out from the rest. */
   selectedProvince: string;
   adminLabels: AdminLabels;
-  controls?: ReactNode;
   points: Array<{
     id: string;
     label: string;
@@ -31,45 +35,82 @@ function lowerFirst(value: string) {
   return value.charAt(0).toLowerCase() + value.slice(1);
 }
 
+function axisTitle(metric: MetricDefinition) {
+  return metric.unit ? `${metric.name} (${metric.unit})` : metric.name;
+}
+
+/** "Prosperity Score" reads as "Prosperity" in a corner label. */
+function shortName(metric: MetricDefinition) {
+  return metric.name.replace(/\s+score$/i, "");
+}
+
+function escapeHtml(value: string) {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+
+function AxisSelect({
+  id,
+  label,
+  value,
+  metrics,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  metrics: MetricDefinition[];
+  onChange: (metricId: string) => void;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <label htmlFor={id} className="text-sm text-ink-muted">
+        {label}
+      </label>
+      <select
+        id={id}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-9 w-full min-w-0 rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:w-60"
+      >
+        {metrics.map((metric) => (
+          <option key={metric.id} value={metric.id}>
+            {metric.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 export function Scatter2DCard({
-  xLabel,
-  yLabel,
+  xMetric,
+  yMetric,
+  scoreMetrics,
   selectedProvince,
   adminLabels,
-  controls,
   points,
 }: Scatter2DCardProps) {
-  const { isDark } = useTheme();
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const theme = useRenderTheme();
+  const { update, isPending } = useSearchParamUpdater();
+  const [, startTransition] = useTransition();
+  // The server owns the axes, so the selects would snap back until the new page lands without this.
+  const [xValue, setXValue] = useOptimistic(xMetric.id);
+  const [yValue, setYValue] = useOptimistic(yMetric.id);
 
-  const visiblePoints = points.filter(
-    (point): point is typeof point & { x: number; y: number } =>
-      point.x !== null && point.y !== null,
-  );
+  function changeAxis(axis: "x" | "y", metricId: string) {
+    startTransition(() => {
+      (axis === "x" ? setXValue : setYValue)(metricId);
+      update({ [axis]: metricId });
+    });
+  }
+
   const evidenceGap = deriveScatterEvidenceGap(points);
-
-  const highlighted = visiblePoints.filter((point) => point.selected);
-  const sameProvince = visiblePoints.filter(
-    (point) => !point.selected && point.province === selectedProvince,
-  );
-  const others = visiblePoints.filter(
-    (point) => !point.selected && point.province !== selectedProvince,
-  );
-  const gridColor = isDark ? "rgba(201,211,234,0.1)" : "rgba(55,66,145,0.08)";
-  const axisColor = isDark ? "rgba(201,211,234,0.28)" : "rgba(55,66,145,0.34)";
-  const tickColor = isDark ? "#c9d3ea" : "#3675b7";
-  const textColor = isDark ? "#f5f7ff" : "#374291";
-  const chartSurface = isDark ? "rgba(7,28,42,0.96)" : "#ffffff";
-  const mutedSeries = isDark ? "rgba(201,211,234,0.54)" : "rgba(55,66,145,0.62)";
   const lowerSingular = adminLabels.lower.singular;
   const lowerPlural = adminLabels.lower.plural;
   const higherSingular = adminLabels.higher.singular;
-  const hoverLocationTemplate = adminLabels.middle
-    ? `${adminLabels.middle.singular}: %{customdata[2]}<br>${higherSingular}: %{customdata[3]}<br>`
-    : `${higherSingular}: %{customdata[3]}<br>`;
-  const exportFileName = `${xLabel.toLowerCase().replace(/\s+/g, "-")}-${yLabel.toLowerCase().replace(/\s+/g, "-")}-comparison.csv`;
+  const xTitle = xMetric.name;
+  const yTitle = yMetric.name;
+  const exportFileName = `${xTitle.toLowerCase().replace(/\s+/g, "-")}-${yTitle.toLowerCase().replace(/\s+/g, "-")}-comparison.csv`;
 
   function handleCsvDownload() {
     const csv = buildCsv(
@@ -78,8 +119,8 @@ export function Scatter2DCard({
         lowerSingular,
         adminLabels.middle?.singular ?? "District",
         higherSingular,
-        xLabel,
-        yLabel,
+        xTitle,
+        yTitle,
         "selected",
       ],
       points.map((point) => [
@@ -96,198 +137,179 @@ export function Scatter2DCard({
     downloadCsv(exportFileName, csv);
   }
 
+  const chart = useMemo(() => {
+    const colors = getPlotlyTheme(theme);
+    const visiblePoints = points.filter(
+      (point): point is typeof point & { x: number; y: number } => point.x !== null && point.y !== null,
+    );
+    const selected = visiblePoints.find((point) => point.selected);
+    const sameProvince = visiblePoints.filter((point) => !point.selected && point.province === selectedProvince);
+    const others = visiblePoints.filter((point) => !point.selected && point.province !== selectedProvince);
+
+    const hoverLocation = adminLabels.middle
+      ? `${adminLabels.middle.singular}: %{customdata[2]}<br>${higherSingular}: %{customdata[3]}<br>`
+      : `${higherSingular}: %{customdata[3]}<br>`;
+    const hovertemplate =
+      `<b>%{text}</b><br>${hoverLocation}` +
+      `${xTitle}: %{x:.1f}<br>${yTitle}: %{y:.1f}<extra></extra>`;
+
+    const trace = (name: string, group: typeof visiblePoints, marker: Record<string, unknown>) => ({
+      type: "scatter",
+      mode: "markers",
+      name,
+      x: group.map((point) => point.x),
+      y: group.map((point) => point.y),
+      text: group.map((point) => point.label),
+      customdata: group.map((point) => [point.id, point.label, point.district, point.province]),
+      marker,
+      hovertemplate,
+    });
+
+    const data = [
+      trace(`Other ${lowerFirst(lowerPlural)}`, others, {
+        color: colors.inkMuted,
+        opacity: 0.4,
+        size: 7,
+        line: { width: 0 },
+      }),
+      trace(`In ${selectedProvince}`, sameProvince, {
+        color: colors.accent,
+        opacity: 0.85,
+        size: 8,
+        line: { color: colors.page, width: 0.5 },
+      }),
+      {
+        ...trace(selected?.label ?? `Selected ${lowerFirst(lowerSingular)}`, selected ? [selected] : [], {
+          color: colors.ink,
+          size: 14,
+          line: { color: colors.page, width: 2 },
+        }),
+        showlegend: selected !== undefined,
+      },
+    ];
+
+    const midline = { color: colors.axis, width: 1 };
+    const cornerLabel = (text: string, x: 0 | 1, y: 0 | 1) => ({
+      xref: "paper",
+      yref: "paper",
+      x,
+      y,
+      xanchor: x === 0 ? "left" : "right",
+      yanchor: y === 0 ? "bottom" : "top",
+      xshift: x === 0 ? 8 : -8,
+      yshift: y === 0 ? 8 : -8,
+      text,
+      showarrow: false,
+      font: { size: 12, color: colors.inkMuted },
+    });
+    const xName = shortName(xMetric);
+    const yName = shortName(yMetric);
+
+    const layout = plotlyLayout(theme, {
+      autosize: true,
+      height: 560,
+      margin: { l: 64, r: 16, t: 40, b: 64 },
+      hovermode: "closest",
+      legend: {
+        orientation: "h",
+        x: 0,
+        xanchor: "left",
+        y: 1.03,
+        yanchor: "bottom",
+        font: { size: 12, color: colors.inkMuted },
+      },
+      xaxis: plotlyAxis(theme, {
+        title: axisTitle(xMetric),
+        range: [0, 100],
+        tickvals: [0, 25, 50, 75, 100],
+        showgrid: false,
+      }),
+      yaxis: plotlyAxis(theme, {
+        title: axisTitle(yMetric),
+        range: [0, 100],
+        tickvals: [0, 25, 50, 75, 100],
+        showgrid: false,
+      }),
+      shapes: [
+        { type: "line", layer: "below", x0: 50, x1: 50, y0: 0, y1: 100, line: midline },
+        { type: "line", layer: "below", x0: 0, x1: 100, y0: 50, y1: 50, line: midline },
+      ],
+      annotations: [
+        cornerLabel(`Low ${xName}, high ${yName}`, 0, 1),
+        cornerLabel(`High ${xName}, high ${yName}`, 1, 1),
+        cornerLabel(`Low ${xName}, low ${yName}`, 0, 0),
+        cornerLabel(`High ${xName}, low ${yName}`, 1, 0),
+        ...(selected
+          ? [
+              {
+                xref: "x",
+                yref: "y",
+                x: selected.x,
+                y: selected.y,
+                text: `<b>${escapeHtml(selected.label)}</b>`,
+                showarrow: true,
+                arrowhead: 0,
+                arrowwidth: 1,
+                arrowcolor: colors.ink,
+                standoff: 9,
+                ax: selected.x > 70 ? -52 : 52,
+                ay: selected.y > 85 ? 40 : -40,
+                font: { size: 13, color: colors.ink },
+                bgcolor: colors.page,
+                borderpad: 3,
+              },
+            ]
+          : []),
+      ],
+    });
+
+    return { data, layout };
+  }, [theme, points, selectedProvince, adminLabels, higherSingular, lowerSingular, lowerPlural, xMetric, yMetric, xTitle, yTitle]);
+
   return (
-    <section className="rounded-[2rem] border border-[var(--border-soft)] bg-[var(--surface-strong)] p-6 shadow-[0_18px_50px_rgba(2,20,32,0.08)]">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
-            2D scatterplot
-          </p>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[var(--foreground)]">
-            {yLabel} vs {xLabel}
-          </h2>
-        </div>
-        <button
-          type="button"
-          onClick={handleCsvDownload}
-          className="inline-flex min-h-10 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--surface)] px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
-        >
+    <div>
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+        <AxisSelect
+          id="scatter-x-axis"
+          label="X axis"
+          value={xValue}
+          metrics={scoreMetrics}
+          onChange={(metricId) => changeAxis("x", metricId)}
+        />
+        <AxisSelect
+          id="scatter-y-axis"
+          label="Y axis"
+          value={yValue}
+          metrics={scoreMetrics}
+          onChange={(metricId) => changeAxis("y", metricId)}
+        />
+        <Button type="button" variant="outline" size="lg" className="sm:ml-auto" onClick={handleCsvDownload}>
           Download CSV
-        </button>
+        </Button>
       </div>
-      <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">
-        Hover for score values, drag to zoom, and click a {lowerFirst(lowerSingular)} to make it the active comparison target.
-      </p>
       {evidenceGap ? (
         <div className="mt-3">
           <EvidenceGapBadge gap={evidenceGap} />
         </div>
       ) : null}
-      {controls ? <div className="mt-5">{controls}</div> : null}
-      <div className="mt-6 overflow-x-auto rounded-[1.5rem] border border-[var(--border-soft)] bg-white/80">
+      <div className="mt-4 overflow-x-auto" aria-busy={isPending}>
         <PlotlyChart
           className="min-w-[720px]"
-          data={[
-            {
-              type: "scatter",
-              mode: "markers",
-              name: `Other ${lowerFirst(lowerPlural)}`,
-              x: others.map((point) => point.x),
-              y: others.map((point) => point.y),
-              text: others.map((point) => point.label),
-              customdata: others.map((point) => [point.id, point.label, point.district, point.province]),
-              marker: {
-                color: mutedSeries,
-                size: 8,
-              },
-              hovertemplate:
-                `<b>%{text}</b><br>${hoverLocationTemplate}` +
-                `${xLabel}: %{x:.2f}<br>${yLabel}: %{y:.2f}<extra></extra>`,
-            },
-            {
-              type: "scatter",
-              mode: "markers",
-              name: `Same ${lowerFirst(higherSingular)}`,
-              x: sameProvince.map((point) => point.x),
-              y: sameProvince.map((point) => point.y),
-              text: sameProvince.map((point) => point.label),
-              customdata: sameProvince.map((point) => [point.id, point.label, point.district, point.province]),
-              marker: {
-                color: "#f4a261",
-                size: 10,
-                line: { color: "#9a4d00", width: 0.6 },
-              },
-              hovertemplate:
-                `<b>%{text}</b><br>${hoverLocationTemplate}` +
-                `${xLabel}: %{x:.2f}<br>${yLabel}: %{y:.2f}<extra></extra>`,
-            },
-            {
-              type: "scatter",
-              mode: "markers",
-              name: `Highlighted ${lowerFirst(lowerSingular)}`,
-              x: highlighted.map((point) => point.x),
-              y: highlighted.map((point) => point.y),
-              text: highlighted.map((point) => point.label),
-              customdata: highlighted.map((point) => [point.id, point.label, point.district, point.province]),
-              marker: {
-                color: "#c1121f",
-                size: 13,
-                line: { color: "#5f0f16", width: 1 },
-              },
-              hovertemplate:
-                `<b>%{text}</b><br>${hoverLocationTemplate}` +
-                `${xLabel}: %{x:.2f}<br>${yLabel}: %{y:.2f}<extra></extra>`,
-            },
-          ]}
-          layout={{
-            autosize: true,
-            height: 720,
-            margin: { l: 72, r: 28, t: 48, b: 72 },
-            paper_bgcolor: "rgba(0,0,0,0)",
-            plot_bgcolor: chartSurface,
-            hovermode: "closest",
-            legend: {
-              orientation: "h",
-              yanchor: "bottom",
-              y: 1.02,
-              xanchor: "left",
-              x: 0,
-              font: { color: textColor },
-            },
-            xaxis: {
-              title: { text: xLabel, font: { color: textColor } },
-              range: [0, 100],
-              showgrid: true,
-              gridcolor: gridColor,
-              zeroline: false,
-              linecolor: axisColor,
-              tickfont: { color: tickColor },
-              mirror: true,
-            },
-            yaxis: {
-              title: { text: yLabel, font: { color: textColor } },
-              range: [0, 100],
-              showgrid: true,
-              gridcolor: gridColor,
-              zeroline: false,
-              linecolor: axisColor,
-              tickfont: { color: tickColor },
-              mirror: true,
-            },
-            shapes: [
-              {
-                type: "rect",
-                x0: 50,
-                x1: 100,
-                y0: 50,
-                y1: 100,
-                fillcolor: "rgba(132, 199, 129, 0.18)",
-                line: { width: 0 },
-                layer: "below",
-              },
-              {
-                type: "rect",
-                x0: 0,
-                x1: 50,
-                y0: 50,
-                y1: 100,
-                fillcolor: "rgba(242, 204, 143, 0.18)",
-                line: { width: 0 },
-                layer: "below",
-              },
-              {
-                type: "rect",
-                x0: 50,
-                x1: 100,
-                y0: 0,
-                y1: 50,
-                fillcolor: "rgba(242, 204, 143, 0.18)",
-                line: { width: 0 },
-                layer: "below",
-              },
-              {
-                type: "rect",
-                x0: 0,
-                x1: 50,
-                y0: 0,
-                y1: 50,
-                fillcolor: "rgba(205, 92, 92, 0.16)",
-                line: { width: 0 },
-                layer: "below",
-              },
-              {
-                type: "line",
-                x0: 50,
-                x1: 50,
-                y0: 0,
-                y1: 100,
-                line: { color: isDark ? "rgba(201,211,234,0.36)" : "rgba(55,66,145,0.55)", width: 1.5, dash: "dash" },
-              },
-              {
-                type: "line",
-                x0: 0,
-                x1: 100,
-                y0: 50,
-                y1: 50,
-                line: { color: isDark ? "rgba(201,211,234,0.36)" : "rgba(55,66,145,0.55)", width: 1.5, dash: "dash" },
-              },
-            ],
-          }}
-          config={{ responsive: true, displaylogo: false }}
+          data={chart.data}
+          layout={chart.layout}
+          config={{ responsive: true, displaylogo: false, displayModeBar: false }}
           style={{ width: "100%", height: "100%" }}
           useResizeHandler
           onClick={(event) => {
-            const point = event.points?.[0];
-            const municipalityId = point?.customdata?.[0];
+            const municipalityId = event.points?.[0]?.customdata?.[0];
             if (typeof municipalityId !== "string" || municipalityId.length === 0) {
               return;
             }
-            const nextParams = new URLSearchParams(searchParams.toString());
-            nextParams.set("municipality", municipalityId);
-            router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
+            update({ municipality: municipalityId });
           }}
         />
       </div>
-    </section>
+      <p className="mt-2 text-sm text-ink-muted sm:hidden">Scroll sideways to see the full chart.</p>
+    </div>
   );
 }

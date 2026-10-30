@@ -1,4 +1,3 @@
-import type { AiTabData } from "@/lib/ai/types";
 import type { CountryCode, CountrySlug } from "@/lib/countries";
 
 export type Pillar = "infrastructure" | "livability" | "prosperity";
@@ -54,6 +53,10 @@ export type ScoreWaterfallGroup = {
 export type MetricDefinition = {
   id: string;
   label: string;
+  /** The label without its unit, for buttons and headings. */
+  name: string;
+  /** The unit from the source label, such as "%" or "nWatts/(cm2 x sr)". Null when the label has none. */
+  unit: string | null;
   kind: "score" | "indicator";
   pillar?: Pillar | null;
   higherIsBetter?: boolean | null;
@@ -166,7 +169,10 @@ export type AnalyticsPageData = {
       label: string;
     }>;
   };
-  coverage: AnalyticsDataset["coverage"];
+  coverage: AnalyticsDataset["coverage"] & {
+    /** Units with scores but no boundary on the map. They are left out of every count, rank, and average. */
+    unitsWithoutBoundary: Array<{ id: string; name: string; district: string; province: string }>;
+  };
   selected: {
     year: number;
     province: string;
@@ -175,7 +181,6 @@ export type AnalyticsPageData = {
     metricId: string;
     xMetricId: string;
     yMetricId: string;
-    aiScoreId: string;
   };
   municipality: MunicipalityRecord;
   map: {
@@ -225,7 +230,29 @@ export type AnalyticsPageData = {
       delta: number | null;
     }>;
   };
+  /**
+   * Every unit in the current year and province filter, ranked by the map metric. Ranks count only
+   * units with a value, mapped or not, so they match the profile's pillar ranks.
+   */
+  ranking: {
+    metricId: string;
+    rankedCount: number;
+    rows: RankingRow[];
+  };
   waterfalls: ScoreWaterfallGroup[];
   provinceSummary: AnalyticsDataset["provinceSummary"];
-  ai: AiTabData;
+};
+
+export type RankingRow = {
+  id: string;
+  compositeKey: string;
+  name: string;
+  district: string;
+  province: string;
+  value: number | null;
+  /** 1 is the highest value. Ties share a rank. Null when the unit has no value. */
+  rank: number | null;
+  /** False when the unit has no boundary on the map. */
+  mapped: boolean;
+  selected: boolean;
 };

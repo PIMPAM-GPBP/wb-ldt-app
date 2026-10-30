@@ -6,7 +6,6 @@ import {
   getReadinessCategory,
   getStrategyInventorySummary,
 } from "../src/lib/strategy-inventory/summarize.ts";
-import { filterStrategyInventoryRecords } from "../src/lib/strategy-inventory/filters.ts";
 
 const records = [
   {
@@ -218,16 +217,4 @@ test("strategy inventory display summary supports temporary placeholder override
     { category: "Needs Validation", count: 0 },
     { category: "Missing", count: 9 },
   ]);
-});
-
-test("strategy inventory filters combine search, year, readiness, type, and translation status", () => {
-  const filtered = filterStrategyInventoryRecords(records, {
-    query: "ada",
-    publicationYear: "2024",
-    readinessCategory: "Found / Not Parsed",
-    documentType: "budget",
-    translationStatus: "needs_translation",
-  });
-
-  assert.deepEqual(filtered.map((record) => record.lsg_name), ["Ada"]);
 });

@@ -14,13 +14,8 @@ export const metadata: Metadata = {
 
 const themeInitializer = `
   try {
-    const storedTheme = window.localStorage.getItem("ldt-theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const theme = storedTheme === "dark" || storedTheme === "light"
-      ? storedTheme
-      : prefersDark
-        ? "dark"
-        : "light";
+    // Light first: only a saved choice of dark opens the site dark.
+    const theme = window.localStorage.getItem("ldt-theme") === "dark" ? "dark" : "light";
     const isDark = theme === "dark";
     document.documentElement.classList.toggle("dark", isDark);
     document.documentElement.dataset.theme = theme;
@@ -42,7 +37,7 @@ export default function RootLayout({
             <div className="relative flex min-h-screen flex-col">
               <a
                 href="#main-content"
-                className="sr-only fixed left-4 top-4 z-[100] rounded-sm bg-[var(--gpb-chrome-bg)] px-4 py-3 text-sm font-semibold text-[var(--gpb-chrome-active)] shadow-lg focus:not-sr-only focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-[var(--gpb-chrome-focus)]"
+                className="sr-only fixed left-4 top-4 z-[100] rounded-sm bg-[var(--gpb-chrome-bg)] px-4 py-3 text-sm font-semibold text-[var(--gpb-chrome-active)] shadow-float focus:not-sr-only focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-[var(--gpb-chrome-focus)]"
               >
                 Skip to main content
               </a>
