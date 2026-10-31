@@ -4,7 +4,6 @@ export const countries = [
     slug: "nepal",
     name: "Nepal",
     analyticsStatus: "live",
-    dataSource: "supabase",
     fallbackDataPath: "src/generated/analytics-data.json",
     mapDataPath: "public/data/nepal-municipalities.geojson",
     adminLabels: {
@@ -76,7 +75,6 @@ export const countries = [
     slug: "zambia",
     name: "Zambia",
     analyticsStatus: "live",
-    dataSource: "supabase",
     fallbackDataPath: "src/generated/zambia/analytics-data.json",
     mapDataPath: "public/data/zambia/municipalities.geojson",
     adminLabels: {
@@ -153,7 +151,6 @@ export const countries = [
     slug: "serbia",
     name: "Serbia",
     analyticsStatus: "live",
-    dataSource: "supabase",
     fallbackDataPath: "src/generated/serbia/analytics-data.json",
     mapDataPath: "public/data/serbia/municipalities.geojson",
     adminLabels: {
@@ -230,8 +227,6 @@ export const countries = [
     slug: "vietnam",
     name: "Vietnam",
     analyticsStatus: "live",
-    dataSource: "local",
-    fallbackDataPath: "src/generated/vietnam/analytics-data.json",
     mapDataPath: "public/data/vietnam/municipalities.geojson",
     adminLabels: {
       lower: { singular: "Commune", plural: "Communes" },

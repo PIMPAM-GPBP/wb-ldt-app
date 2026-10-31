@@ -1,6 +1,3 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-
 import Image from "next/image";
 
 import pilDiagram from "../../images/PIL Diagram v2.png";
@@ -9,6 +6,7 @@ import nplAnalyticsData from "@/generated/analytics-data.json";
 import serbiaAnalyticsData from "@/generated/serbia/analytics-data.json";
 import zambiaAnalyticsData from "@/generated/zambia/analytics-data.json";
 import { countries } from "@/lib/countries";
+import { getCountryCoverageSummary } from "@/lib/data/queries";
 
 const analyticsDatasets = [
   nplAnalyticsData,
@@ -24,24 +22,10 @@ const latestDataYearFromImports = Math.max(
   ...analyticsDatasets.map((dataset) => dataset.release.year),
 );
 
-// Vietnam's generated dataset is far larger than the other countries' fallback files, so it is
-// read lazily at request time instead of being statically imported into the page bundle.
+// Vietnam has no generated fallback file to import. Its data is only in Supabase.
 async function loadVietnamSummary() {
   try {
-    const filePath = path.join(
-      process.cwd(),
-      "src/generated/vietnam/analytics-data.json",
-    );
-    const raw = await readFile(filePath, "utf8");
-    const dataset = JSON.parse(raw) as {
-      coverage: { analyticsMunicipalityCount: number };
-      release: { year: number };
-    };
-
-    return {
-      analyticsMunicipalityCount: dataset.coverage.analyticsMunicipalityCount,
-      year: dataset.release.year,
-    };
+    return await getCountryCoverageSummary("VNM");
   } catch {
     return { analyticsMunicipalityCount: 0, year: 0 };
   }
