@@ -5,7 +5,7 @@ import test from "node:test";
 test("branding assets and PIL diagram are wired into the app", async () => {
   await Promise.all([
     access("images/gpb-logo.png"),
-    access("images/ldt-logo-dark.png"),
+    access("images/ldt-mark-white.png"),
     access("images/pimpam_logo.png"),
     access("images/PIL Diagram v2.png"),
     access("images/about-ldt-size-distribution.png"),
@@ -19,13 +19,15 @@ test("branding assets and PIL diagram are wired into the app", async () => {
   ]);
 
   const header = await readFile("src/components/layout/app-header.tsx", "utf8");
+  const wordmark = await readFile("src/components/layout/ldt-wordmark.tsx", "utf8");
   const suiteBranding = await readFile("src/components/layout/gpb-suite-branding.tsx", "utf8");
   const home = await readFile("src/app/page.tsx", "utf8");
   const methodology = await readFile("src/app/methodology/page.tsx", "utf8");
-  const layoutBranding = `${header}\n${suiteBranding}`;
+  const layoutBranding = `${header}\n${wordmark}\n${suiteBranding}`;
 
   assert.match(layoutBranding, /images\/gpb-logo\.png/);
-  assert.match(layoutBranding, /images\/ldt-logo-dark\.png/);
+  assert.match(layoutBranding, /images\/ldt-mark-white\.png/);
+  assert.match(wordmark, /Local Development Tracker/);
   assert.match(layoutBranding, /images\/pimpam_logo\.png/);
   // The framework diagram lives on Methodology; the home page leads with the country maps.
   assert.match(methodology, /PIL Diagram v2\.png/);

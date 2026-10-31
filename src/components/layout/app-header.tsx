@@ -11,6 +11,7 @@ import {
   GpbSuiteBadge,
 } from "@/components/layout/gpb-suite-branding";
 import { CountrySwitcher } from "@/components/layout/country-switcher";
+import { LdtWordmark } from "@/components/layout/ldt-wordmark";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { countryHref, countryWorkspaceLinks, currentCountry, headerNavItems } from "@/components/layout/site-links";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import ldtLogo from "../../../images/ldt-logo-dark.png";
+import ldtMark from "../../../images/ldt-mark-white.png";
 
 function isActivePath(pathname: string, href: string, exact?: boolean) {
   if (href.includes("#")) {
@@ -50,7 +51,7 @@ function ChromeNavLink({
       href={href}
       onClick={onClick}
       className={cn(
-        "group relative inline-flex min-h-11 items-center px-3 text-sm font-semibold text-[var(--gpb-chrome-link)] transition-colors duration-200 hover:text-[var(--gpb-chrome-active)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--gpb-chrome-focus)]",
+        "group relative inline-flex min-h-11 items-center px-3 text-sm font-semibold whitespace-nowrap text-[var(--gpb-chrome-link)] transition-colors duration-200 hover:text-[var(--gpb-chrome-active)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--gpb-chrome-focus)]",
         active && "text-[var(--gpb-chrome-active)]",
       )}
       aria-current={active ? "page" : undefined}
@@ -91,15 +92,10 @@ export function AppHeader() {
           className="flex min-w-0 items-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--gpb-chrome-focus)]"
           aria-label="Local Development Tracker home"
         >
-          <Image
-            src={ldtLogo}
-            alt="Local Development Tracker"
-            priority
-            className="h-12 w-auto object-contain"
-          />
+          <LdtWordmark priority />
         </Link>
 
-        <nav aria-label="Main" className="hidden min-w-0 flex-1 items-center justify-center gap-3 lg:flex">
+        <nav aria-label="Main" className="hidden min-w-0 flex-1 items-center justify-center gap-2 lg:flex xl:gap-3">
           <CountrySwitcher />
           <span aria-hidden="true" className="h-5 w-px bg-[var(--gpb-chrome-divider)]" />
           {headerNavItems.map((item) => (
@@ -137,15 +133,12 @@ export function AppHeader() {
             </SheetTrigger>
             <SheetContent className="w-[min(88vw,23rem)] border-[var(--gpb-chrome-divider)] bg-[var(--gpb-chrome-bg)] text-[var(--gpb-chrome-active)]">
               <SheetHeader className="gap-3 p-5">
-                <Image
-                  src={ldtLogo}
-                  alt="Local Development Tracker"
-                  priority
-                  className="h-12 w-auto object-contain"
-                />
-                <SheetTitle className="text-left text-[var(--gpb-chrome-active)]">
-                  Local Development Tracker
-                </SheetTitle>
+                <div className="flex items-center gap-2.5">
+                  <Image src={ldtMark} alt="" className="size-10 shrink-0" />
+                  <SheetTitle className="text-left font-heading text-lg leading-tight text-[var(--gpb-chrome-active)]">
+                    Local Development Tracker
+                  </SheetTitle>
+                </div>
                 <SheetDescription className="text-left text-[var(--gpb-chrome-link)]">
                   Local development scores for Nepal, Serbia, and Zambia.
                 </SheetDescription>

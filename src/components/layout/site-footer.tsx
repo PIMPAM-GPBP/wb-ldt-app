@@ -1,10 +1,9 @@
-import Image from "next/image";
 import Link from "next/link";
 
 import { GpbSuiteBadge, PimPamLogoPlate } from "@/components/layout/gpb-suite-branding";
+import { LdtWordmark } from "@/components/layout/ldt-wordmark";
 import { countryWorkspaceLinks, footerNavItems } from "@/components/layout/site-links";
-import { getAllReleaseMetadata, getGlobalReleaseSummary } from "@/lib/release-metadata";
-import ldtLogo from "../../../images/ldt-logo-dark.png";
+import { getAllReleaseMetadata } from "@/lib/release-metadata";
 
 const footerLinkClass =
   "inline-flex min-h-8 items-center text-sm text-[var(--gpb-chrome-link)] transition-colors duration-200 hover:text-[var(--gpb-chrome-active)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--gpb-chrome-focus)]";
@@ -14,7 +13,6 @@ const footerLinkClass =
  * the ways to the data, and the producers' marks. It does not repeat the header's links.
  */
 export function SiteFooter() {
-  const summary = getGlobalReleaseSummary();
   const names = new Intl.ListFormat("en", { type: "conjunction" }).format(
     [...getAllReleaseMetadata()].sort((a, b) => a.countryName.localeCompare(b.countryName)).map((release) => release.countryName),
   );
@@ -28,11 +26,10 @@ export function SiteFooter() {
             className="inline-flex focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--gpb-chrome-focus)]"
             aria-label="Local Development Tracker home"
           >
-            <Image src={ldtLogo} alt="Local Development Tracker" className="h-12 w-auto object-contain" />
+            <LdtWordmark />
           </Link>
           <p className="mt-5 max-w-md text-base leading-7 text-[var(--gpb-chrome-active)]">
-            Local development scores for {summary.totalLoadedLocalUnits.toLocaleString("en-US")} local governments in {names}, from satellite and open
-            data.
+            Local development scores for thousands of local governments in {names}, from satellite and open data.
           </p>
           <p className="mt-3 max-w-md text-sm leading-6 text-[var(--gpb-chrome-link)]">
             Built by the World Bank Global PIM-PAM Solutions Team, with support from the World Bank Financial Management Umbrella Program and the Japan

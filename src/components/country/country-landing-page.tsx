@@ -7,7 +7,7 @@ import { ARTICLE_LINK } from "@/components/layout/article";
 import { MapUnitLinks } from "@/components/maps/map-unit-links";
 import { PillarMapSwitch } from "@/components/maps/pillar-map-switch";
 import { buttonVariants } from "@/components/ui/button";
-import { formatScore } from "@/lib/analytics/derive";
+import { PILLARS, formatScore } from "@/lib/analytics/derive";
 import type { Country } from "@/lib/countries";
 import { buildCountryHomeModel } from "@/lib/country-home";
 import { getCountryWorkspaceLinks } from "@/lib/country-landing-actions";
@@ -100,6 +100,8 @@ export async function CountryLandingPage({ country }: { country: Country }) {
   const guide = country.adminLevelGuide;
   const context = country.profile.context;
   const workspaceLinks = getCountryWorkspaceLinks(country);
+  const { lower: lowerLabel, middle: middleLabel, higher: higherLabel } = country.adminLabels;
+  const mapLabels = { lower: lowerLabel.singular, middle: middleLabel?.singular ?? null, higher: higherLabel.singular };
 
   return (
     <main className="flex-1">
@@ -154,13 +156,22 @@ export async function CountryLandingPage({ country }: { country: Country }) {
           </h2>
           <div className="mt-4">
             <PillarMapSwitch classes={PILLAR_MAP_CLASSES} name="country-pillar" note={`Fifths of ${country.name}'s ${unitPlural}`}>
-              <MapUnitLinks hrefBase={unitHref(country, "")}>
+              <MapUnitLinks hrefBase={unitHref(country, "")} year={map.year} labels={mapLabels}>
                 <svg viewBox={`0 0 ${map.width} ${map.height}`} className="mx-auto mt-6 block h-auto max-h-[38rem] w-full" role="img" aria-labelledby="country-map-title">
                   <title id="country-map-title">{`Map of ${country.name}'s ${unitPlural}, colored by fifths of the chosen score. Select a ${lower(country.adminLabels.lower.singular)} to open it in the map; the lists below link to every one.`}</title>
                   {map.units.map((unit) => (
-                    <path key={unit.key} d={unit.d} data-k={unit.key} data-p={unit.classes.prosperity} data-i={unit.classes.infrastructure} data-l={unit.classes.livability}>
-                      <title>{unit.name}</title>
-                    </path>
+                    <path
+                      key={unit.key}
+                      d={unit.d}
+                      data-k={unit.key}
+                      data-p={unit.classes.prosperity}
+                      data-i={unit.classes.infrastructure}
+                      data-l={unit.classes.livability}
+                      data-n={unit.name}
+                      data-m={mapLabels.middle ? unit.district : undefined}
+                      data-h={unit.province}
+                      data-s={PILLARS.map((pillar) => unit.scores[pillar.id]?.toFixed(1) ?? "").join("|")}
+                    />
                   ))}
                 </svg>
               </MapUnitLinks>

@@ -9,12 +9,23 @@ import type { Country } from "@/lib/countries";
 import { buildOutlineMap, type BoundaryCollection } from "@/lib/maps/outline";
 import type { AnalyticsDataset, Pillar } from "@/types/analytics";
 
-/** One country as a static SVG map: every unit's outline, name, and fifth on each pillar. */
+/** One country as a static SVG map: every unit's outline, names, and score and fifth on each pillar. */
 export type PillarMap = {
   slug: string;
+  /** The release year the scores and fifths come from. */
+  year: number;
   width: number;
   height: number;
-  units: Array<{ key: string; name: string; d: string; classes: Partial<Record<Pillar, number>> }>;
+  units: Array<{
+    key: string;
+    name: string;
+    /** For countries with two levels the data repeats the higher level here; see Country.adminLabels.middle. */
+    district: string;
+    province: string;
+    d: string;
+    scores: Partial<Record<Pillar, number>>;
+    classes: Partial<Record<Pillar, number>>;
+  }>;
 };
 
 export const PILLAR_MAP_CLASSES = 5;
@@ -49,24 +60,44 @@ async function buildPillarMap(country: Country, width: number, height: number, e
   );
   return {
     slug: country.slug,
+    year: dataset.release.year,
     width: outline.width,
     height: outline.height,
     units: outline.units.map((unit) => {
       const record = latest.get(unit.compositeKey);
+      const scores: Partial<Record<Pillar, number>> = {};
       const classes: Partial<Record<Pillar, number>> = {};
       for (const pillar of PILLARS) {
         const value = record?.scores[pillar.scoreId];
-        const index = isNumber(value) ? classIndexFor(value, scales.get(pillar.id) ?? []) : null;
+        if (!isNumber(value)) continue;
+        scores[pillar.id] = value;
+        const index = classIndexFor(value, scales.get(pillar.id) ?? []);
         if (index !== null) classes[pillar.id] = index;
       }
-      return { key: unit.compositeKey, name: record?.municipality ?? unit.compositeKey.split("::").at(-1) ?? unit.compositeKey, d: unit.d, classes };
+      // Composite keys are "province::district::unit", which names a boundary that has no scores.
+      const [province = "", district = "", name = unit.compositeKey] = unit.compositeKey.split("::");
+      return {
+        key: unit.compositeKey,
+        name: record?.municipality ?? name,
+        district: record?.district ?? district,
+        province: record?.province ?? province,
+        d: unit.d,
+        scores,
+        classes,
+      };
     }),
   };
 }
 
-/** Fills for every pillar and class in both themes, keyed on the data attributes the maps and legend carry. */
+/**
+ * Fills for every pillar and class in both themes, keyed on the data attributes the maps and legend
+ * carry, plus the rule that shows only the chosen pillar's score in the map's hover card.
+ */
 export function pillarMapStyles() {
-  const base = "[data-map-pillar] svg path{fill:var(--surface-muted);stroke:var(--background);stroke-width:0.6;vector-effect:non-scaling-stroke}";
+  const base =
+    "[data-map-pillar] svg path{fill:var(--surface-muted);stroke:var(--background);stroke-width:0.6;vector-effect:non-scaling-stroke}" +
+    "[data-map-pillar] [data-tip-pillar]{display:none}" +
+    PILLARS.map((pillar) => `[data-map-pillar="${pillar.id}"] [data-tip-pillar="${pillar.id}"]{display:flex}`).join("");
   const fills = PILLARS.flatMap((pillar) => {
     const attribute = `data-${pillar.id[0]}`;
     return (["light", "dark"] as const).flatMap((theme) =>
