@@ -190,7 +190,7 @@ export const countries = [
     },
     profile: {
       populationMillions: 6.7,
-      areaKm2: 312717,
+      areaKm2: null,
       context: {
         summary:
           "Serbia's LDT workspace connects municipality-level PIL evidence to national strategy, EU-aligned reform priorities, service delivery, competitiveness, and climate-resilient development questions.",

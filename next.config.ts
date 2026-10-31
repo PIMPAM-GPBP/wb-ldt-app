@@ -31,7 +31,7 @@ const nextConfig: NextConfig = {
     "/zambia": analyticsFallbackFiles,
     "/serbia": analyticsFallbackFiles,
     "/[country]/analytics": analyticsFallbackFiles,
-    "/api/countries/[country]/scores": analyticsFallbackFiles,
+    "/api/countries/*/scores": analyticsFallbackFiles,
     "/api/indicators": analyticsFallbackFiles,
     "/methodology": analyticsFallbackFiles,
     "/about": analyticsFallbackFiles,

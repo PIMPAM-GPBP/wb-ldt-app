@@ -13,6 +13,10 @@ import {
   type CountryCode,
 } from "@/lib/countries";
 import { scoreComponentIndicatorMappings } from "@/lib/data/labels";
+import {
+  buildReleaseMunicipalityMembership,
+  filterMunicipalitiesByReleaseMembership,
+} from "@/lib/data/release-membership";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   AnalyticsDataset,
@@ -318,8 +322,8 @@ const loadScoreValuesForRelease = cache(async (releaseId: string, year: number) 
       .select("municipality_id, score_id, score_value")
       .eq("release_id", releaseId)
       .eq("year", year)
-      .order("municipality_id")
-      .order("score_id")
+      .order("municipality_id", { ascending: true })
+      .order("score_id", { ascending: true })
       .range(from, to),
   );
 });
@@ -335,7 +339,8 @@ const loadIndicatorValuesForRelease = cache(
         .eq("release_id", releaseId)
         .eq("year", year)
         .eq("indicator_id", indicatorId)
-        .order("municipality_id")
+        .order("municipality_id", { ascending: true })
+        .order("indicator_id", { ascending: true })
         .range(from, to),
     );
   },
@@ -351,8 +356,8 @@ const loadScoreComponentValuesForRelease = cache(async (releaseId: string, year:
         .select("municipality_id, component_id, score_value")
         .eq("release_id", releaseId)
         .eq("year", year)
-        .order("municipality_id")
-        .order("component_id")
+        .order("municipality_id", { ascending: true })
+        .order("component_id", { ascending: true })
         .range(from, to),
     );
   } catch (error) {
@@ -376,7 +381,7 @@ const loadContextValuesForRelease = cache(async (releaseId: string, year: number
         )
         .eq("release_id", releaseId)
         .eq("year", year)
-        .order("municipality_id")
+        .order("municipality_id", { ascending: true })
         .range(from, to),
     );
   } catch (error) {
@@ -472,8 +477,14 @@ function buildMapFeatures(
   featureCollection: MapFeatureCollection,
   municipalitiesByCompositeKey: Map<string, MunicipalityRecord>,
   metric: MetricDefinition,
+  renderableMapMunicipalityKeys: ReadonlySet<string>,
 ) {
   return featureCollection.features
+    .filter(
+      (feature) =>
+        Boolean(feature.geometry) &&
+        renderableMapMunicipalityKeys.has(feature.properties.compositeKey),
+    )
     .map((feature) => {
       const municipality = municipalitiesByCompositeKey.get(feature.properties.compositeKey);
       if (!municipality) {
@@ -486,6 +497,23 @@ function buildMapFeatures(
       } satisfies AnalyticsFeature;
     })
     .filter((feature): feature is AnalyticsFeature => feature !== null);
+}
+
+function getRenderableMapMunicipalityKeys(
+  featureCollection: MapFeatureCollection,
+  unitKeys: ReadonlySet<string>,
+) {
+  const keys = new Set<string>();
+
+  for (const feature of featureCollection.features) {
+    if (!feature.geometry || !unitKeys.has(feature.properties.compositeKey)) {
+      continue;
+    }
+
+    keys.add(feature.properties.compositeKey);
+  }
+
+  return keys;
 }
 
 function buildScoreIndex(rows: ScoreValueRow[]) {
@@ -592,9 +620,7 @@ export async function getAnalyticsPageData(
   const [baseData, localFallback, featureCollection] = await Promise.all([
     loadSupabaseBaseData(country.code),
     loadLocalAnalyticsFallback(country.code),
-    shouldBuildMapData
-      ? loadMapFeatureCollection(country.code)
-      : Promise.resolve({ type: "FeatureCollection", features: [] } satisfies MapFeatureCollection),
+    loadMapFeatureCollection(country.code),
   ]);
 
   if (baseData.releases.length === 0) {
@@ -620,11 +646,14 @@ export async function getAnalyticsPageData(
     existing.push(row);
     scoreComponentRowsByParentId.set(row.parent_score_id, existing);
   }
-  const fallbackMunicipalitiesByCompositeKey = new Map(
-    localFallback.municipalities.map((municipality) => [municipality.compositeKey, municipality]),
+  const fallbackMunicipalityMembership = buildReleaseMunicipalityMembership(
+    localFallback.municipalities,
+    selectedYear,
+    {
+      selectedReleaseKey: selectedRelease.release_key,
+      bundledReleaseKey: localFallback.release.key,
+    },
   );
-  const fallbackMapFeatureKeys = new Set(localFallback.mapFeatureKeys);
-
   const scoreDefinitions = baseData.scoreDefinitions.map((definition) => {
     const fallback = fallbackScoreDefinitionsById.get(definition.id);
     const componentRows = scoreComponentRowsByParentId.get(definition.id) ?? [];
@@ -680,15 +709,6 @@ export async function getAnalyticsPageData(
     ),
   ] satisfies MetricDefinition[];
 
-  const availableProvinces = [
-    "all",
-    ...[...new Set(baseData.municipalities.map((municipality) => municipality.province))].sort(),
-  ];
-  const requestedProvince = getSearchValue(searchParams.province, "all");
-  const selectedProvince = availableProvinces.includes(requestedProvince)
-    ? requestedProvince
-    : "all";
-
   const scoreMetrics = metrics.filter((metric) => metric.kind === "score");
   const selectedMapMetric = findMetricById(
     metrics,
@@ -722,8 +742,19 @@ export async function getAnalyticsPageData(
   const scoreComponentIndex = buildScoreComponentIndex(scoreComponentValueRows);
   const contextIndex = buildContextIndex(contextValueRows);
 
-  const allMunicipalitiesForYear = baseData.municipalities.map((municipality) => {
-    const fallback = fallbackMunicipalitiesByCompositeKey.get(municipality.composite_key);
+  const releaseMunicipalities = filterMunicipalitiesByReleaseMembership(
+    baseData.municipalities,
+    fallbackMunicipalityMembership,
+  );
+  // A unit has a boundary when the map file holds a feature with geometry for it.
+  const renderableMapMunicipalityKeys = getRenderableMapMunicipalityKeys(
+    featureCollection,
+    new Set(releaseMunicipalities.map((municipality) => municipality.composite_key)),
+  );
+  const allMunicipalitiesForYear = releaseMunicipalities.map((municipality) => {
+    const fallback = fallbackMunicipalityMembership.byCompositeKey.get(
+      municipality.composite_key,
+    );
     const scores = scoreIndex.get(municipality.id) ?? {};
     const indicators = indicatorIndex.get(municipality.id) ?? {};
 
@@ -739,7 +770,7 @@ export async function getAnalyticsPageData(
         province: municipality.province_slug,
       },
       year: selectedYear,
-      mapAvailable: fallbackMapFeatureKeys.has(municipality.composite_key),
+      mapAvailable: renderableMapMunicipalityKeys.has(municipality.composite_key),
       indicators,
       scoreComponents:
         scoreComponentIndex.get(municipality.id) ?? fallback?.scoreComponents ?? {},
@@ -762,10 +793,25 @@ export async function getAnalyticsPageData(
   });
 
   // Everything below counts, ranks, and averages only units with a boundary; see splitByBoundary.
-  const { withBoundary: municipalitiesForYear, withoutBoundary: unitsWithoutBoundary } = splitByBoundary(
+  const { withBoundary: municipalitiesForYear } = splitByBoundary(
     allMunicipalitiesForYear,
-    fallbackMapFeatureKeys,
+    renderableMapMunicipalityKeys,
   );
+  // Units with scores in this release that are left out, either for having no boundary or for being
+  // absent from the bundled release list, are listed under the ranking. Nepal's 55 slivers are both.
+  const countedMunicipalityIds = new Set(municipalitiesForYear.map((municipality) => municipality.id));
+  const unitsWithoutBoundary = baseData.municipalities.filter(
+    (municipality) => !countedMunicipalityIds.has(municipality.id) && scoreIndex.has(municipality.id),
+  );
+
+  const availableProvinces = [
+    "all",
+    ...[...new Set(municipalitiesForYear.map((municipality) => municipality.province))].sort(),
+  ];
+  const requestedProvince = getSearchValue(searchParams.province, "all");
+  const selectedProvince = availableProvinces.includes(requestedProvince)
+    ? requestedProvince
+    : "all";
 
   const provinceFilteredMunicipalities =
     selectedProvince === "all"
@@ -788,12 +834,14 @@ export async function getAnalyticsPageData(
   const municipalitiesByCompositeKey = new Map(
     municipalitiesForYear.map((municipality) => [municipality.compositeKey, municipality]),
   );
+  const mapMunicipalityCount = renderableMapMunicipalityKeys.size;
 
   const mapFeatures = shouldBuildMapData
     ? buildMapFeatures(
         featureCollection,
         municipalitiesByCompositeKey,
         selectedMapMetric,
+        renderableMapMunicipalityKeys,
       ).filter((feature) =>
         selectedProvince === "all"
           ? true
@@ -802,10 +850,6 @@ export async function getAnalyticsPageData(
     : [];
 
   const metricSummary = buildMetricSummary(provinceFilteredMunicipalities, selectedMapMetric);
-  // The map draws boundaries from the GeoJSON file, so a unit is mapped when its key appears there.
-  const mappedCompositeKeys = new Set(
-    featureCollection.features.map((feature) => feature.properties.compositeKey),
-  );
   const ranking = shouldBuildMapData
     ? rankUnits(
         provinceFilteredMunicipalities.map((municipality) => ({
@@ -815,7 +859,7 @@ export async function getAnalyticsPageData(
           district: municipality.district,
           province: municipality.province,
           value: getMetricValue(municipality, selectedMapMetric),
-          mapped: mappedCompositeKeys.has(municipality.compositeKey),
+          mapped: municipality.mapAvailable,
         })),
         selectedMunicipality.id,
       )
@@ -967,8 +1011,8 @@ export async function getAnalyticsPageData(
     },
     coverage: {
       analyticsMunicipalityCount: municipalitiesForYear.length,
-      mapMunicipalityCount: baseData.mapMunicipalityCount,
-      analyticsOnlyCount: municipalitiesForYear.length - baseData.mapMunicipalityCount,
+      mapMunicipalityCount,
+      analyticsOnlyCount: Math.max(0, municipalitiesForYear.length - mapMunicipalityCount),
       boundaryOnlyCount: localFallback.coverage.boundaryOnlyCount,
       unitsWithoutBoundary: unitsWithoutBoundary.map((municipality) => ({
         id: municipality.id,
@@ -991,7 +1035,7 @@ export async function getAnalyticsPageData(
       metric: selectedMapMetric,
       features: mapFeatures,
       summary: metricSummary,
-      coverageLabel: `${baseData.mapMunicipalityCount} mapped of ${municipalitiesForYear.length} analytics municipalities`,
+      coverageLabel: `${mapMunicipalityCount} mapped of ${municipalitiesForYear.length} analytics municipalities`,
     },
     ranking: {
       metricId: selectedMapMetric.id,

@@ -4,7 +4,7 @@
 import type { ReadinessCategory, StrategyInventoryRecord } from "./types.ts";
 
 export const STATUS_LABELS: Record<ReadinessCategory, string> = {
-  "AI-ready": "Text read",
+  "AI-ready": "Ready to use",
   "Found / Not Parsed": "Not yet read",
   "Needs Translation": "Needs translation",
   "Needs Validation": "Needs a check",

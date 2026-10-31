@@ -5,7 +5,7 @@ import { InventoryTable } from "@/components/strategy-inventory/inventory-table"
 import { StatusMarker } from "@/components/strategy-inventory/status-marker";
 import type { Country } from "@/lib/countries";
 import { STATUS_COLORS, STATUS_LABELS, coversYear, toInventoryRow } from "@/lib/strategy-inventory/public";
-import { getReadinessCategory, getStrategyInventoryDisplaySummary } from "@/lib/strategy-inventory/summarize";
+import { getReadinessCategory, getStrategyInventorySummary } from "@/lib/strategy-inventory/summarize";
 import type { PublicationYearCount, ReadinessCategory, StrategyInventoryDataset } from "@/lib/strategy-inventory/types";
 import { cn } from "@/lib/utils";
 
@@ -15,7 +15,7 @@ const formatPercent = (value: number) => `${Math.round(value * 100)}%`;
 function statusMeaning(status: ReadinessCategory, unit: string) {
   switch (status) {
     case "AI-ready":
-      return `The PDF downloaded, its text was read, and an automatic check matched it to the ${unit}.`;
+      return `The PDF downloaded, its text was read, an automatic check matched it to the ${unit}, and it needs no translation.`;
     case "Found / Not Parsed":
       return "There is a link, but the document has not been read yet.";
     case "Needs Translation":
@@ -86,7 +86,7 @@ function YearColumns({ counts }: { counts: readonly PublicationYearCount[] }) {
  * by toInventoryRow, which keep only fixed sentences.
  */
 export function StrategyInventoryDashboard({ dataset, country }: { dataset: StrategyInventoryDataset; country: Country }) {
-  const summary = getStrategyInventoryDisplaySummary(dataset.records, dataset.expected_lsg_count, dataset.summary_override);
+  const summary = getStrategyInventorySummary(dataset.records, dataset.expected_lsg_count);
   const unit = country.adminLabels.lower.singular.toLowerCase();
   const unitPlural = country.adminLabels.lower.plural.toLowerCase();
   const checked = summary.latest_last_updated ?? dataset.last_updated;
@@ -96,6 +96,8 @@ export function StrategyInventoryDashboard({ dataset, country }: { dataset: Stra
   const breakdown = summary.status_breakdown.filter((entry) => entry.count > 0);
   const breakdownTotal = breakdown.reduce((sum, entry) => sum + entry.count, 0);
   const unknownYears = summary.unknown_year_count;
+  // Expected units with no row at all; the table can only list units that have one.
+  const unlisted = summary.unlisted_missing_lsg_count;
   const serbian = dataset.country_code === "SRB";
 
   return (
@@ -128,10 +130,10 @@ export function StrategyInventoryDashboard({ dataset, country }: { dataset: Stra
               note={`${formatPercent(summary.coverage_rate)} of ${unitPlural} have at least one link to a plan, working or not.`}
             />
             <Stat
-              label="Text read"
+              label="Ready to use"
               value={summary.ai_ready_documents}
               total={summary.total_documents_found}
-              note={`Linked documents whose text was read and matched to the ${unit}.`}
+              note={`Linked documents whose text was read, matched to the ${unit}, and needs no translation.`}
             />
             <Stat
               label={`Cover ${year}`}
@@ -192,15 +194,24 @@ export function StrategyInventoryDashboard({ dataset, country }: { dataset: Stra
           <h2 id="inventory-table" className="font-heading text-2xl leading-tight font-semibold text-ink">
             Every {unit}
           </h2>
-          <div className="mt-5">
-            <InventoryTable
-              rows={rows}
-              unitSingular={unit}
-              unitPlural={unitPlural}
-              regionLabel={country.adminLabels.higher.singular}
-              localLang={serbian ? "sr" : undefined}
-            />
-          </div>
+          {unlisted > 0 ? (
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-muted">
+              {unlisted === summary.expected_lsgs
+                ? `The inventory has no rows for ${country.name}'s ${summary.expected_lsgs.toLocaleString("en-US")} ${unitPlural} yet, so each counts as having no document.`
+                : `${unlisted.toLocaleString("en-US")} of ${country.name}'s ${summary.expected_lsgs.toLocaleString("en-US")} ${unitPlural} have no row in the inventory yet. They count as having no document above and are not in the table.`}
+            </p>
+          ) : null}
+          {rows.length > 0 ? (
+            <div className="mt-5">
+              <InventoryTable
+                rows={rows}
+                unitSingular={unit}
+                unitPlural={unitPlural}
+                regionLabel={country.adminLabels.higher.singular}
+                localLang={serbian ? "sr" : undefined}
+              />
+            </div>
+          ) : null}
         </section>
 
         <section aria-labelledby="inventory-about" className="mt-16 border-t border-[var(--border-soft)] pt-6">
@@ -215,8 +226,8 @@ export function StrategyInventoryDashboard({ dataset, country }: { dataset: Stra
             </p>
             <p>
               Coverage counts {unitPlural} with at least one link, so a {unit} whose only link failed still counts. The years in the table are the ones a
-              plan states it covers; where it states none, the table gives the year it was published.
-              {serbian ? " Plans in Serbian count as read without translation." : null}
+              plan states it covers; where it states none, the table gives the year it was published. A plan the list marks as needing
+              translation is not ready to use until it is translated.
             </p>
             <p>
               Return to the{" "}

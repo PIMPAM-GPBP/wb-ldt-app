@@ -8,7 +8,7 @@ import { useRenderTheme } from "@/components/analytics/use-render-theme";
 import { useSearchParamUpdater } from "@/components/analytics/use-search-param-updater";
 import { Button } from "@/components/ui/button";
 import type { AdminLabels } from "@/lib/countries";
-import { buildCsv, downloadCsv } from "@/lib/csv";
+import { buildComparisonCsv, downloadCsv } from "@/lib/csv";
 import { deriveScatterEvidenceGap } from "@/lib/evidence-gaps";
 import type { MetricDefinition } from "@/types/analytics";
 
@@ -113,26 +113,14 @@ export function Scatter2DCard({
   const exportFileName = `${xTitle.toLowerCase().replace(/\s+/g, "-")}-${yTitle.toLowerCase().replace(/\s+/g, "-")}-comparison.csv`;
 
   function handleCsvDownload() {
-    const csv = buildCsv(
-      [
-        "id",
-        lowerSingular,
-        adminLabels.middle?.singular ?? "District",
-        higherSingular,
-        xTitle,
-        yTitle,
-        "selected",
-      ],
-      points.map((point) => [
-        point.id,
-        point.label,
-        point.district,
-        point.province,
-        point.x,
-        point.y,
-        point.selected,
-      ]),
-    );
+    const csv = buildComparisonCsv({
+      lowerLabel: lowerSingular,
+      middleLabel: adminLabels.middle?.singular ?? null,
+      higherLabel: higherSingular,
+      xLabel: xTitle,
+      yLabel: yTitle,
+      points,
+    });
 
     downloadCsv(exportFileName, csv);
   }

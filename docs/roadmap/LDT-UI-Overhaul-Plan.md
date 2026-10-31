@@ -761,6 +761,44 @@ Open for Son:
   82 of Serbia's 161 municipalities need a check; 59 of those are links that timed out or did not return a PDF, which a rerun of the link check may clear.
 - Serbian local names in the inventory are the Latin names, so a search in Cyrillic finds only document titles.
 
+#### Merge of GitHub's v1.5, result (2026-10-31)
+
+`origin/v1.5` (8f7929c, 48 commits from 11 to 23 October) is merged into `ui-overhaul` as a local merge commit and is not pushed.
+The dry run found 14 conflicts.
+
+What came in:
+- Paging in `src/lib/data/queries.ts` orders by unique keys, the same fix this branch had made; v1.5's explicit form is kept.
+- Release membership (`src/lib/data/release-membership.ts`): when the selected release matches the bundled data's release, only the bundled data's units for that year are kept.
+- Map coverage counts boundary features that have geometry, not rows in Supabase's boundary table.
+- The comparison CSV comes from `buildComparisonCsv` in `src/lib/csv.ts`, which labels the axes "X:" and "Y:" when both are the same metric.
+- The Zambia plan fetch pins the Sectigo intermediate certificate.
+- The process-wide cache of plan document sources in `src/lib/ai/documents.ts` is gone, so changes to that table show up without a restart.
+- `npm test` runs every test with v1.5's loader hook; `LOCAL_SETUP.md` and `.env.sample` describe local setup.
+- Serbia's area is no longer hard-coded at 312,717 km², which is Poland's area; the country page already derives it from the data.
+
+What stayed out:
+- The AI stage files this branch deleted stay deleted, along with v1.5's fixes to them and five tests that only cover them.
+- v1.5's form keys on the old analytics page fix stale `defaultValue` selects; the new workspace has no uncontrolled inputs, so the bug cannot occur.
+- `LOCAL_SETUP.md`, `.env.sample`, the tracing config, and `scripts/verify-country-api-tracing.mjs` now describe this branch's routes and env vars.
+  The web app makes no model calls, so the Exa key and the generation flags are gone from both files.
+
+Decisions made in the merge:
+- Units are filtered in two layers: v1.5's release membership first, then this branch's boundary guard, which now uses v1.5's geometry check.
+  On live data the result is unchanged: Nepal counts 751 units, Bhaktapur is 538th, 28th, and 38th of 751, and the note lists the 55 slivers.
+  The guard still matters for a release the bundled data does not know, such as a future Nepal release built the same way, where membership keeps every unit.
+  Two of v1.5's tests expected such a release to rank a unit with no boundary; they now expect it in the note instead.
+- The note under the ranking lists every unit with scores in the release that is left out, whichever filter dropped it.
+  Without that, v1.5's membership filter removed Nepal's 55 slivers before the guard saw them, and the note disappeared.
+- Serbian readiness follows v1.5, with Son's agreement: a plan the data marks as needing translation is not ready, in Serbian or not.
+  Serbia now shows 1 of 151 linked documents ready and 68 needing translation, against 68 and 1 before.
+  "Text read" became "Ready to use", since 68 plans whose text was read are not ready; the about note says translation is required.
+- The inventory page names expected units that have no inventory row at all, and skips the table when a country has no rows, as Zambia's sample does.
+  Live data has no such units today.
+
+Checked: `npm test` and `node --test tests/*.test.mjs` both run 203 tests, 202 passing and one skipped (v1.5's opt-in live TLS test).
+`tsc`, `eslint`, the surfaces check, the production build, and the tracing script pass.
+Against the production build, the analytics pages for all three countries and both inventory pages return 200, nothing overflows at 375px, and the inventory HTML has no notes, auto-check fields, or `utm_` parameters.
+
 ### Phase 6: optional
 
 - Municipality profile pages at their own URLs and a rankings view, following the Capitalism Index's rankings, profiles, and compare split.
