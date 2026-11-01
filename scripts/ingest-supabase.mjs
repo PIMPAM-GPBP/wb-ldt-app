@@ -132,6 +132,19 @@ if (scoreComponentError) {
   throw scoreComponentError;
 }
 
+// score_definitions.component_score_keys lists the same grouping, so keep it in step.
+for (const definition of firstAnalyticsData.scoreDefinitions) {
+  const { error: scoreKeysError } = await supabase
+    .schema("analytics")
+    .from("score_definitions")
+    .update({ component_score_keys: definition.componentIds })
+    .eq("id", definition.id);
+
+  if (scoreKeysError) {
+    throw scoreKeysError;
+  }
+}
+
 const sourcePayload = firstAnalyticsData.indicatorDefinitions.flatMap((indicator) =>
   indicator.sources.map((source, index) => ({
     indicator_id: indicator.id,
